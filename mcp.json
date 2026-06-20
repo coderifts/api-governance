@@ -1,0 +1,121 @@
+{
+  "schema_version": "v1",
+  "name": "coderifts",
+  "display_name": "CodeRifts — API Governance",
+  "description": "Risk-aware API compatibility governance. Before merge: predicts whether an API change will cause a real production problem, who breaks, by what pattern, at what business cost, and whether blocking is justified.",
+  "version": "1.0.0",
+  "contact": {
+    "email": "peter@coderifts.com",
+    "url": "https://coderifts.com"
+  },
+  "authentication": {
+    "type": "bearer",
+    "description": "API key from https://coderifts.com — set as Authorization: Bearer <key>"
+  },
+  "tools": [
+    {
+      "name": "coderifts.preflight_check",
+      "description": "Analyze an API spec diff before merge. Returns risk score, break probability, blast radius, agent impact, economic cost of incident, and merge decision (ALLOW/WARN/REQUIRE_APPROVAL/BLOCK).",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "before": { "type": "string", "description": "Base OpenAPI spec as YAML or JSON string" },
+          "after": { "type": "string", "description": "Updated OpenAPI spec as YAML or JSON string" },
+          "branch_name": { "type": "string", "description": "Target branch name (optional)" }
+        },
+        "required": ["before", "after"]
+      },
+      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/diff" }
+    },
+    {
+      "name": "coderifts.agent_tool_check",
+      "description": "Check if an API change breaks AI agent tool calling. Detects TOOL_RESULT_SHAPE_DRIFT, TOOL_CALLING_SCHEMA_DRIFT, AGENT_PROTOCOL_DRIFT and other agent-specific patterns. Returns S_agent score and per-pattern mitigation templates for Grok, Claude, and Copilot.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "before": { "type": "string", "description": "Base OpenAPI spec" },
+          "after": { "type": "string", "description": "Updated OpenAPI spec" }
+        },
+        "required": ["before", "after"]
+      },
+      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/diff" }
+    },
+    {
+      "name": "coderifts.agent_readiness_score",
+      "description": "Score an OpenAPI spec or MCP manifest for AI agent readiness. Returns 0-100 score with band (STRONG/GOOD/FAIR/POOR/CRITICAL) and per-signal breakdown across 9 signals.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "spec": { "type": "string", "description": "OpenAPI spec or MCP manifest as YAML or JSON string" },
+          "spec_type": { "type": "string", "enum": ["openapi", "mcp"], "description": "Type of spec (default: openapi)" }
+        },
+        "required": ["spec"]
+      },
+      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/agent-readiness-score" }
+    },
+    {
+      "name": "coderifts.registry_validate",
+      "description": "Validate an MCP tool registry or OpenAPI spec collection for governance health. Checks 7 signals including schema consistency, auth coverage, deprecation compliance, and breaking change density.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "specs": { "type": "array", "items": { "type": "string" }, "description": "Array of OpenAPI specs or MCP manifests as YAML/JSON strings" }
+        },
+        "required": ["specs"]
+      },
+      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/registry-validate" }
+    },
+    {
+      "name": "coderifts.agent_preflight",
+      "description": "Pre-flight governance check for AI agent workflows. Given tool schemas before and after, returns which tools break, which agent workflows are affected, blast radius across the agent graph, and whether deployment should be blocked.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "tools_before": { "type": "array", "items": { "type": "object" }, "description": "Current tool schemas" },
+          "tools_after": { "type": "array", "items": { "type": "object" }, "description": "Updated tool schemas" },
+          "workflow_type": { "type": "string", "description": "Agent workflow type (optional)" }
+        },
+        "required": ["tools_before", "tools_after"]
+      },
+      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/agent/preflight" }
+    },
+    {
+      "name": "coderifts.traffic_analyze",
+      "description": "Infer API spec drift from HTTP traffic samples. Detects behavioral patterns without requiring spec changes. Use for runtime drift detection.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "traffic_samples": { "type": "array", "description": "Array of HTTP traffic samples" },
+          "baseline_spec": { "type": "string", "description": "Current OpenAPI spec (optional)" }
+        },
+        "required": ["traffic_samples"]
+      },
+      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/traffic-analyze" }
+    },
+    {
+      "name": "coderifts.mcp_diff",
+      "description": "Compare two MCP manifests and detect breaking changes in tool schemas, input/output contracts, auth requirements, and tool availability.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "before": { "type": "string", "description": "Current MCP manifest as JSON string" },
+          "after": { "type": "string", "description": "Updated MCP manifest as JSON string" }
+        },
+        "required": ["before", "after"]
+      },
+      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/mcp-diff" }
+    },
+    {
+      "name": "coderifts.governance_health",
+      "description": "Get the governance health score for an API spec. Returns A-F grade (0-100), policy violations, deprecation status, documentation coverage, and security findings.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "spec": { "type": "string", "description": "OpenAPI spec as YAML or JSON string" }
+        },
+        "required": ["spec"]
+      },
+      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/diff" }
+    }
+  ]
+}
