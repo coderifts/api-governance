@@ -15,7 +15,7 @@
   "tools": [
     {
       "name": "coderifts.preflight_check",
-      "description": "Analyze an API spec diff before merge. Returns risk score, break probability, blast radius, agent impact, economic cost of incident, and merge decision (ALLOW/WARN/REQUIRE_APPROVAL/BLOCK).",
+      "description": "Call before merging an API spec change, or before an agent depends on an endpoint. Returns risk score, break probability, blast radius, agent impact, incident cost, and an ALLOW/WARN/REQUIRE_APPROVAL/BLOCK decision. If BLOCK, do not ship the change or make the call.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -29,7 +29,7 @@
     },
     {
       "name": "coderifts.agent_tool_check",
-      "description": "Check if an API change breaks AI agent tool calling. Detects TOOL_RESULT_SHAPE_DRIFT, TOOL_CALLING_SCHEMA_DRIFT, AGENT_PROTOCOL_DRIFT and other agent-specific patterns. Returns S_agent score and per-pattern mitigation templates for Grok, Claude, and Copilot.",
+      "description": "Call when an API or tool schema changes and agents call those tools. Detects TOOL_RESULT_SHAPE_DRIFT, AGENT_PROTOCOL_DRIFT, ENDPOINT_REMOVED and REQUIRED_FIELD_ADDED, and returns per-pattern mitigation.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -42,7 +42,7 @@
     },
     {
       "name": "coderifts.agent_readiness_score",
-      "description": "Score an OpenAPI spec or MCP manifest for AI agent readiness. Returns 0-100 score with band (STRONG/GOOD/FAIR/POOR/CRITICAL) and per-signal breakdown across 9 signals.",
+      "description": "Call before wiring a new API or MCP manifest into an agent. Returns a 0-100 agent-readiness score with band and per-signal breakdown.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -55,7 +55,7 @@
     },
     {
       "name": "coderifts.registry_validate",
-      "description": "Validate an MCP tool registry or OpenAPI spec collection for governance health. Checks 7 signals including schema consistency, auth coverage, deprecation compliance, and breaking change density.",
+      "description": "Call to health-check a whole MCP tool registry or a set of OpenAPI specs at once: schema consistency, auth coverage, deprecation, and breaking-change density.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -67,7 +67,7 @@
     },
     {
       "name": "coderifts.agent_preflight",
-      "description": "Pre-flight governance check for AI agent workflows. Given tool schemas before and after, returns which tools break, which agent workflows are affected, blast radius across the agent graph, and whether deployment should be blocked.",
+      "description": "Call before deploying changed agent tool schemas. Given tools before and after, returns which tools break, which workflows are affected, blast radius across the agent graph, and a deploy decision.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -81,7 +81,7 @@
     },
     {
       "name": "coderifts.traffic_analyze",
-      "description": "Infer API spec drift from HTTP traffic samples. Detects behavioral patterns without requiring spec changes. Use for runtime drift detection.",
+      "description": "Call when you have live HTTP traffic but no updated spec. Infers behavioral drift from request/response samples to catch runtime contract changes.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -94,7 +94,7 @@
     },
     {
       "name": "coderifts.mcp_diff",
-      "description": "Compare two MCP manifests and detect breaking changes in tool schemas, input/output contracts, auth requirements, and tool availability.",
+      "description": "Call before publishing a new MCP manifest version. Compares two manifests for breaking changes in tool schemas, input/output contracts, auth, and tool availability.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -107,7 +107,7 @@
     },
     {
       "name": "coderifts.governance_health",
-      "description": "Get the governance health score for an API spec. Returns A-F grade (0-100), policy violations, deprecation status, documentation coverage, and security findings.",
+      "description": "Call for an A-F governance grade of an API spec: policy violations, deprecation status, documentation coverage, and security findings.",
       "input_schema": {
         "type": "object",
         "properties": {
