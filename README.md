@@ -89,7 +89,7 @@ Decision logic is deterministic: a single breaking change is never silently allo
 - Decision Spec: https://coderifts.com/decision-spec/
 - API reference: https://app.coderifts.com/api/docs
 - Manifest: https://coderifts.com/mcp.json
-- Contact: peter@coderifts.com
+- Contact: hello@coderifts.com
 
 ## License
 
