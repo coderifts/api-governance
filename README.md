@@ -58,9 +58,8 @@ Expected: a JSON-RPC `result` with `serverInfo` and `capabilities.tools`.
 | `agent_readiness_score` | Score an OpenAPI spec or MCP manifest for AI agent readiness (0–100) across nine signals, with band and breakdown. |
 | `registry_validate` | Validate an MCP tool registry or OpenAPI spec collection for governance health (schema consistency, auth coverage, deprecation, breaking-change density). |
 | `agent_preflight` | Pre-flight governance check for agent workflows. Given tool schemas before/after, returns which tools break, which workflows are affected, blast radius across the agent graph, and a deploy decision. |
-| `traffic_analyze` | Infer API spec drift from HTTP traffic samples — runtime behavioral drift detection without requiring spec changes. |
 | `mcp_diff` | Compare two MCP manifests and detect breaking changes in tool schemas, input/output contracts, auth requirements, and tool availability. |
-| `governance_health` | Governance health score for an API spec: A–F grade (0–100), policy violations, deprecation status, documentation coverage, and security findings. |
+| `governance_health` | Governance check for an API change (before/after OpenAPI specs): decision (ALLOW/WARN/REQUIRE_APPROVAL/BLOCK), risk_score, breaking_changes, patterns, policy_violations, security_findings, and evidence_quality. |
 
 Every tool returns the same **Decision Spec v1.0** envelope (`decision`, `risk_score`, `safe_for_agent`, `breaking_changes`, `patterns`, `requires_migration`, `evidence_quality`, `coderifts_version`, `timestamp`) so agent runtimes can branch on a stable contract.
 
