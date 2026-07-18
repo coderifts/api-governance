@@ -19,7 +19,7 @@ CodeRifts runs as a hosted **Streamable HTTP** MCP server. Any MCP-compatible ag
 - **Endpoint:** `https://app.coderifts.com/mcp`
 - **Transport:** Streamable HTTP (protocol version `2025-06-18`)
 - **Server:** `CodeRifts API Governance` `v1.0.0`
-- **Auth:** Bearer API key from [coderifts.com](https://coderifts.com) — `Authorization: Bearer <key>`
+- **Auth:** `initialize` and `tools/list` are open (no key); `tools/call` requires an API key - send `Authorization: Bearer <key>` or `X-API-Key: <key>`.
 
 ### Connect
 
@@ -47,6 +47,20 @@ curl -sS https://app.coderifts.com/mcp \
 
 Expected: a JSON-RPC `result` with `serverInfo` and `capabilities.tools`.
 
+### Try without a key
+
+Two public endpoints need no auth at all:
+
+```bash
+curl -s "https://app.coderifts.com/api/v1/public/preflight?url=https://petstore3.swagger.io/api/v3/openapi.json"
+
+curl -s -X POST https://app.coderifts.com/api/v1/public/actionguard-check \
+  -H "Content-Type: application/json" \
+  -d '{"filename":".github/workflows/ci.yml","base_content":null,"head_content":"jobs:\n  b:\n    steps:\n      - uses: some-owner/some-action@main"}'
+```
+
+Both return `200` with a `decision` field.
+
 ---
 
 ## Tools
@@ -54,9 +68,9 @@ Expected: a JSON-RPC `result` with `serverInfo` and `capabilities.tools`.
 | Tool | What it does |
 |------|--------------|
 | `preflight_check` | Analyze an API spec diff before merge. Returns risk score, break probability, blast radius, agent impact, economic cost, and a merge decision (ALLOW / WARN / REQUIRE_APPROVAL / BLOCK). |
-| `agent_tool_check` | Detect whether an API change breaks AI agent tool calling (TOOL_RESULT_SHAPE_DRIFT, AGENT_PROTOCOL_DRIFT, and more). Returns an agent-impact score and per-pattern mitigation templates. |
+| `agent_tool_check` | Detect whether an API change breaks AI agent tool calling (TOOL_RESULT_SHAPE_DRIFT, AGENT_PROTOCOL_DRIFT, and more). Returns an agent-impact score and per-pattern consequence details. |
 | `agent_readiness_score` | Score an OpenAPI spec or MCP manifest for AI agent readiness (0–100) across nine signals, with band and breakdown. |
-| `registry_validate` | Validate an MCP tool registry or OpenAPI spec collection for governance health (schema consistency, auth coverage, deprecation, breaking-change density). |
+| `registry_validate` | Validate a set of OpenAPI specs together: cross-spec endpoint collisions, schema naming conflicts, auth scope consistency, and unresolved $ref targets. |
 | `agent_preflight` | Pre-flight governance check for agent workflows. Given tool schemas before/after, returns which tools break, which workflows are affected, blast radius across the agent graph, and a deploy decision. |
 | `mcp_diff` | Compare two MCP manifests and detect breaking changes in tool schemas, input/output contracts, auth requirements, and tool availability. |
 | `governance_health` | Governance check for an API change (before/after OpenAPI specs): decision (ALLOW/WARN/REQUIRE_APPROVAL/BLOCK), risk_score, breaking_changes, patterns, policy_violations, security_findings, and evidence_quality. |
@@ -77,7 +91,7 @@ Decision logic is deterministic: a single breaking change is never silently allo
 
 ## Also available
 
-- **GitHub App** (zero-config, one-click install) on the GitHub Marketplace — posts a risk scorecard on every pull request.
+- **GitHub App** (zero-config, one-click install) on the GitHub Marketplace - posts a four-gate governance report (API contract, schema-vs-code, auth surface, workflow actions) on every pull request.
 - **SDKs:** `@coderifts/sdk` (TypeScript / npm), `coderifts-sdk` (Python / PyPI).
 - **CLI:** `coderifts` (npm) with a pre-push hook.
 - **Integrations:** Backstage plugin, VS Code extension, LangGraph / AutoGen / CrewAI.
@@ -88,6 +102,7 @@ Decision logic is deterministic: a single breaking change is never silently allo
 - Decision Spec: https://coderifts.com/decision-spec/
 - API reference: https://app.coderifts.com/api/docs
 - Manifest: https://coderifts.com/mcp.json
+- Receipt verifier (verify our receipts without trusting us): https://github.com/coderifts/receipt-verifier
 - Contact: hello@coderifts.com
 
 ## License
