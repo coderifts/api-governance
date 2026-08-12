@@ -1,4 +1,5 @@
 {
+  "$comment": "GENERATED tools[] from MCP_MANIFEST + OUTPUT_SCHEMAS (coderifts-app src/routes/mcp-streamable.js). Do not edit tools by hand; run: node scripts/generate-mcp-json.js --out <path-to-website>/mcp.json. Top-level registry fields (schema_version, name, display_name, description, version, contact, authentication) are hand-written / preserved. Protocol tools/list stays camelCase; this card uses snake_case input_schema / output_schema by conversion.",
   "schema_version": "v1",
   "name": "coderifts",
   "display_name": "CodeRifts — API Governance",
@@ -14,108 +15,838 @@
   },
   "tools": [
     {
-      "name": "coderifts.preflight_check",
-      "description": "Call before merging an API spec change, or before an agent depends on an endpoint. Returns risk score, break probability, blast radius, agent impact, incident cost, and an ALLOW/WARN/REQUIRE_APPROVAL/BLOCK decision. If BLOCK, do not ship the change or make the call.",
+      "name": "preflight_change_set",
+      "description": "Preflight a COMPLETE base→head change set of contract artifacts and return\nrisk score and breaking-change analysis — plus, on the AUTHORIZE path only, a governance decision\n(ALLOW / WARN / REQUIRE_APPROVAL / BLOCK) and a signed chain-receipt when applicable. ANALYZE\nreturns informational risk only: analysis_outcome, may_execute:false, no decision, no receipt.\n\nRequires a pending base→head (before/after) contract change you are about to\nact on (merge, deploy, publish, or register tools). No pending change set →\ndo not call this tool.\n\nUse this when:\n- You are about to merge, push, deploy, publish, or register/expose agent tools,\n  AND the change includes ≥1 contract artifact (OpenAPI/Swagger, GraphQL SDL,\n  gRPC/protobuf, AsyncAPI, MCP manifest, or agent tool schemas: type=agent_tools,\n  including before re-registering tools with a runtime).\n- You have (or can assemble) FULL base and head for every changed contract\n  artifact in this set — not a single-file subset when other contract files also\n  change.\n- You need a NEW decision for the CURRENT change; you do not already hold a\n  currently-valid receipt for this exact target/operation.\n- You hold a receipt for a different operation or target than the act you will\n  perform (e.g. ALLOW for merge, now deploying) — re-call with the intended\n  operation; a differently-scoped receipt is not reusable authorization.\n\nDo not use when:\n- The change is documentation-only (README, guides, comments) with no contract\n  artifact content change — do not call any CodeRifts tool.\n- You already hold a signed receipt and only need to check it is authentic and\n  currently valid — use coderifts.verify_receipt instead.\n- You need details of a PREVIOUS decision by decision_id — use\n  coderifts.get_decision_details instead.\n- You want a static 0–100 \"agent readiness\" score for one OpenAPI/MCP file and\n  there is no pending base→head mutate — use coderifts.agent_readiness_score\n  (advanced / opt-in; not one of the three default tools). If that tool is not\n  in your available list, call none of the CodeRifts tools; do not substitute\n  preflight_change_set.\n- You cannot supply both before and after (or base and head) for the artifacts\n  that change — fix the change set first; do not invent empty before specs.\n\nInputs: list of artifacts, each with type, before, after (or equivalent), plus\noptional operation (merge|deploy|tool_call|publish), environment/stakes, and\ncontext. Returns decision, execution_action, risk fields, and chain_receipt when issued.\n\nMode (required): pass preflight_mode. Use \"analyze\" for informational risk only\n(returns analysis_outcome with may_execute:false, no decision/execution_action/\nsafe_for_agent, no receipt). Use \"authorize\" for the operation-bound path that can\nmint a receipt (requires context.operation: merge|deploy|publish|tool_call). Under\nDecision Spec 2.0 the mode is mandatory; omission is an error unless a legacy\ndecision_spec_version \"1.0\" pin is set.",
       "input_schema": {
         "type": "object",
         "properties": {
-          "before": { "type": "string", "description": "Base OpenAPI spec as YAML or JSON string" },
-          "after": { "type": "string", "description": "Updated OpenAPI spec as YAML or JSON string" },
-          "branch_name": { "type": "string", "description": "Target branch name (optional)" }
+          "artifacts": {
+            "type": "array",
+            "description": "Contract artifacts to analyze together (max 20). Each is { id, type, before, after }.",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Caller-chosen id, unique within the bundle"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "openapi",
+                    "graphql",
+                    "grpc",
+                    "asyncapi",
+                    "mcp_manifest",
+                    "agent_tools"
+                  ]
+                },
+                "before": {
+                  "type": "string",
+                  "description": "Prior artifact content (spec/schema/manifest) as a string"
+                },
+                "after": {
+                  "type": "string",
+                  "description": "Updated artifact content as a string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "before",
+                "after"
+              ]
+            }
+          },
+          "context": {
+            "type": "object",
+            "description": "Optional apply-site context folded into the bundle fingerprint. operation distinguishes merge vs deploy vs publish (and other labels); the server accepts any string for operation (change-set.js) — conventional values below.",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "description": "Application operation for this change set (fingerprint + envelope). Server accepts any non-empty string; conventional values: merge, deploy, tool_call, publish. Merge is not deploy is not publish — the receipt/gate must match this label."
+              },
+              "environment": {
+                "type": "string",
+                "description": "Target environment (e.g. production, staging, npm) — optional; folded into fingerprint when set."
+              },
+              "repository": {
+                "type": "string",
+                "description": "Repository identity (optional; fingerprint context)"
+              },
+              "branch": {
+                "type": "string",
+                "description": "Branch name (optional; fingerprint context)"
+              },
+              "pull_request": {
+                "description": "Pull request id when applicable (optional; fingerprint context)",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "policy_profile": {
+                "type": "string",
+                "description": "Policy profile name (optional; fingerprint context)"
+              }
+            }
+          },
+          "previous_receipt": {
+            "type": "string",
+            "description": "Optional prior chain receipt token to link"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "description": "Optional client key; a repeat with the same key + body replays the original decision (24h)"
+          },
+          "preflight_mode": {
+            "type": "string",
+            "enum": [
+              "analyze",
+              "authorize"
+            ],
+            "description": "REQUIRED. \"analyze\" = informational risk only (no decision/execution_action/safe_for_agent; analysis_outcome + may_execute:false). \"authorize\" = operation-bound path; may mint a receipt (requires context.operation). Decision Spec 2.0: omission is an error unless decision_spec_version is '1.0' (30-day legacy pin with soft-default analyze)."
+          },
+          "decision_spec_version": {
+            "type": "string",
+            "enum": [
+              "1.0",
+              "2.0"
+            ],
+            "description": "Optional pin. '1.0' = legacy contract (soft-default mode + analyze still carries decision/execution_action) until the sunset date. Omit or '2.0' = current contract."
+          }
         },
-        "required": ["before", "after"]
+        "required": [
+          "artifacts",
+          "preflight_mode"
+        ]
       },
-      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/diff" }
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "endpoint": {
+        "method": "POST",
+        "url": "https://app.coderifts.com/api/v1/preflight"
+      },
+      "output_schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "ANALYZE mode (Decision Spec 2.0): informational only. MUST NOT contain decision, execution_action, safe_for_agent, chain_receipt, decision_result, control_envelope, or required_action_core. Branch on analysis_outcome; never treat as permission. Field set GENERATED from preflight-response.v2.producer.json (agent-facing allowlist).",
+            "properties": {
+              "preflight_mode": {
+                "const": "analyze"
+              },
+              "analysis_outcome": {
+                "type": "string",
+                "enum": [
+                  "NO_BREAK_DETECTED",
+                  "BREAKS_DETECTED",
+                  "ANALYSIS_FAILED"
+                ],
+                "description": "Closed analysis outcome set derived from engine-visible state only."
+              },
+              "authorization_effect": {
+                "const": "NONE",
+                "description": "Analyze never authorizes; always NONE."
+              },
+              "may_execute": {
+                "const": false,
+                "description": "Analyze never grants execute permission."
+              },
+              "receipt_kind": {
+                "const": "NONE",
+                "description": "Analyze never mints a receipt."
+              },
+              "analysis_control": {
+                "type": "object"
+              },
+              "risk_score": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "breaking_changes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "requires_migration": {
+                "type": "boolean"
+              },
+              "evidence_quality": {
+                "type": "string"
+              },
+              "patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "pattern_sources": {
+                "type": "array"
+              },
+              "detected_patterns": {
+                "type": "array",
+                "description": "GOVERNANCE detector detail rows (src/change-patterns.js; validated by decision-spec-fields.js). Row shape measured live: name, severity, description, consequence, affected_path, affected_field; optional side (request|response) on ENUM_NARROWING. Names ⊆ patterns (not equality). Agent-detector names may appear only in patterns. Free-text fields are untrusted.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "severity",
+                    "description",
+                    "consequence",
+                    "affected_path",
+                    "affected_field"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Governance pattern name; appears in patterns when both are carried."
+                    },
+                    "severity": {
+                      "type": "string",
+                      "description": "Row severity from the pattern catalog (observed set: CRITICAL, HIGH, MEDIUM). NOT a closed control enum — branch on execution_action, never on this."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "What the detector matched. Untrusted free text."
+                    },
+                    "consequence": {
+                      "type": "string",
+                      "description": "What breaks for a consumer if this ships. Untrusted free text."
+                    },
+                    "affected_path": {
+                      "type": "string",
+                      "description": "Contract path this row is about. Empty string when the detector had none — the key is always emitted."
+                    },
+                    "affected_field": {
+                      "type": "string",
+                      "description": "Field within affected_path. Empty string when the detector had none — the key is always emitted."
+                    },
+                    "side": {
+                      "type": "string",
+                      "enum": [
+                        "request",
+                        "response"
+                      ],
+                      "description": "Optional; currently set on ENUM_NARROWING only. Request-side narrowing is agent-breaking (threaded so safe_for_agent can distinguish it). Absent when the detector did not set it."
+                    }
+                  }
+                }
+              },
+              "breaking_changes_details": {
+                "type": "array",
+                "description": "Per-change IR/detail rows from the engine (src/blast/diff-to-change.js maps these). Measured row keys: type, path, method, field, severity, description. Distinct from breaking_changes (integer count).",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "description": "Change kind / IR type code (e.g. response.body.property.remove)."
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "method": {
+                      "type": "string"
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "severity": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "severity_summary": {
+                "type": "object",
+                "description": "Bundle severity axes (src/change-set.js severity_summary). Distinct axes, not contradictory. Measured keys: diff_severity, governance_severity, policy_effect, note.",
+                "additionalProperties": false,
+                "properties": {
+                  "diff_severity": {
+                    "type": "string",
+                    "description": "Structural size of the schema change."
+                  },
+                  "governance_severity": {
+                    "type": "string",
+                    "description": "How the rule engine rates the change."
+                  },
+                  "policy_effect": {
+                    "type": "string",
+                    "description": "Resulting decision effect label."
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              },
+              "decision_basis": {},
+              "analysis": {
+                "type": "object",
+                "description": "Tier-2 analysis mirror (src/response-envelope.js buildAnalysisTier / attachControlSurface). Dual-write of flat analysis fields present on the verdict plus remediations[]. ANALYSIS_TIER_FIELDS subset when present; not a closed property set.",
+                "additionalProperties": true
+              },
+              "human_report": {
+                "type": "object",
+                "description": "Human-readable report tier (src/response-envelope.js buildHumanReport / analyze v2 stub). Measured keys: summary, breaking_highlights, suggestions, next_steps_prose.",
+                "additionalProperties": false,
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  },
+                  "breaking_highlights": {
+                    "type": "array"
+                  },
+                  "suggestions": {
+                    "type": "array"
+                  },
+                  "next_steps_prose": {
+                    "type": "string"
+                  }
+                }
+              },
+              "verdict_fingerprint": {
+                "type": "string"
+              },
+              "bundle_fingerprint": {
+                "type": "string"
+              },
+              "decision_spec_version": {
+                "type": "string",
+                "description": "Decision Spec major for this response (typically '2.0')."
+              },
+              "artifacts": {
+                "type": "array"
+              },
+              "evidence": {
+                "type": "array"
+              },
+              "operation": {},
+              "timestamp": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "preflight_mode",
+              "analysis_outcome",
+              "authorization_effect",
+              "may_execute",
+              "receipt_kind"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "decision"
+                  ]
+                },
+                {
+                  "required": [
+                    "execution_action"
+                  ]
+                },
+                {
+                  "required": [
+                    "safe_for_agent"
+                  ]
+                },
+                {
+                  "required": [
+                    "chain_receipt"
+                  ]
+                },
+                {
+                  "required": [
+                    "decision_result"
+                  ]
+                },
+                {
+                  "required": [
+                    "control_envelope"
+                  ]
+                },
+                {
+                  "required": [
+                    "required_action_core"
+                  ]
+                }
+              ]
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "object",
+            "description": "AUTHORIZE mode: operation-bound decision. Branch on execution_action (not decision, not safe_for_agent). Field set GENERATED from preflight-response.v2.producer.json (agent-facing allowlist). Compatibility: https://coderifts.com/schemas/decision-result.v1.consumer.json",
+            "properties": {
+              "preflight_mode": {
+                "const": "authorize"
+              },
+              "receipt_kind": {
+                "type": "string",
+                "enum": [
+                  "operation_authorization",
+                  "NONE"
+                ],
+                "description": "operation_authorization when a chain receipt was issued; NONE if signer unconfigured."
+              },
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "ALLOW",
+                  "WARN",
+                  "REQUIRE_APPROVAL",
+                  "BLOCK"
+                ]
+              },
+              "execution_action": {
+                "type": "string",
+                "enum": [
+                  "CONTINUE",
+                  "CONTINUE_WITH_MONITORING",
+                  "REQUEST_APPROVAL",
+                  "STOP"
+                ]
+              },
+              "safe_for_agent": {
+                "type": "boolean"
+              },
+              "control_envelope": {
+                "type": "object"
+              },
+              "risk_score": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "breaking_changes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "requires_migration": {
+                "type": "boolean"
+              },
+              "evidence_quality": {
+                "type": "string"
+              },
+              "patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "pattern_sources": {
+                "type": "array"
+              },
+              "detected_patterns": {
+                "type": "array",
+                "description": "GOVERNANCE detector detail rows (src/change-patterns.js; validated by decision-spec-fields.js). Row shape measured live: name, severity, description, consequence, affected_path, affected_field; optional side (request|response) on ENUM_NARROWING. Names ⊆ patterns (not equality). Agent-detector names may appear only in patterns. Free-text fields are untrusted.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "severity",
+                    "description",
+                    "consequence",
+                    "affected_path",
+                    "affected_field"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Governance pattern name; appears in patterns when both are carried."
+                    },
+                    "severity": {
+                      "type": "string",
+                      "description": "Row severity from the pattern catalog (observed set: CRITICAL, HIGH, MEDIUM). NOT a closed control enum — branch on execution_action, never on this."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "What the detector matched. Untrusted free text."
+                    },
+                    "consequence": {
+                      "type": "string",
+                      "description": "What breaks for a consumer if this ships. Untrusted free text."
+                    },
+                    "affected_path": {
+                      "type": "string",
+                      "description": "Contract path this row is about. Empty string when the detector had none — the key is always emitted."
+                    },
+                    "affected_field": {
+                      "type": "string",
+                      "description": "Field within affected_path. Empty string when the detector had none — the key is always emitted."
+                    },
+                    "side": {
+                      "type": "string",
+                      "enum": [
+                        "request",
+                        "response"
+                      ],
+                      "description": "Optional; currently set on ENUM_NARROWING only. Request-side narrowing is agent-breaking (threaded so safe_for_agent can distinguish it). Absent when the detector did not set it."
+                    }
+                  }
+                }
+              },
+              "breaking_changes_details": {
+                "type": "array",
+                "description": "Per-change IR/detail rows from the engine (src/blast/diff-to-change.js maps these). Measured row keys: type, path, method, field, severity, description. Distinct from breaking_changes (integer count).",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "description": "Change kind / IR type code (e.g. response.body.property.remove)."
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "method": {
+                      "type": "string"
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "severity": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "severity_summary": {
+                "type": "object",
+                "description": "Bundle severity axes (src/change-set.js severity_summary). Distinct axes, not contradictory. Measured keys: diff_severity, governance_severity, policy_effect, note.",
+                "additionalProperties": false,
+                "properties": {
+                  "diff_severity": {
+                    "type": "string",
+                    "description": "Structural size of the schema change."
+                  },
+                  "governance_severity": {
+                    "type": "string",
+                    "description": "How the rule engine rates the change."
+                  },
+                  "policy_effect": {
+                    "type": "string",
+                    "description": "Resulting decision effect label."
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              },
+              "decision_basis": {},
+              "analysis": {
+                "type": "object",
+                "description": "Tier-2 analysis mirror (src/response-envelope.js buildAnalysisTier / attachControlSurface). Dual-write of flat analysis fields present on the verdict plus remediations[]. ANALYSIS_TIER_FIELDS subset when present; not a closed property set.",
+                "additionalProperties": true
+              },
+              "human_report": {
+                "type": "object",
+                "description": "Human-readable report tier (src/response-envelope.js buildHumanReport / analyze v2 stub). Measured keys: summary, breaking_highlights, suggestions, next_steps_prose.",
+                "additionalProperties": false,
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  },
+                  "breaking_highlights": {
+                    "type": "array"
+                  },
+                  "suggestions": {
+                    "type": "array"
+                  },
+                  "next_steps_prose": {
+                    "type": "string"
+                  }
+                }
+              },
+              "chain_receipt": {
+                "type": "string"
+              },
+              "chain_status": {
+                "type": "string"
+              },
+              "decision_result": {
+                "type": "object",
+                "description": "decision-result.v1 envelope when issuance path produced one (validate with decision-result.v1.producer.json)."
+              },
+              "verdict_fingerprint": {
+                "type": "string"
+              },
+              "bundle_fingerprint": {
+                "type": "string"
+              },
+              "decision_spec_version": {
+                "type": "string",
+                "description": "Decision Spec major for this response (typically '2.0')."
+              },
+              "coderifts_version": {
+                "type": "string"
+              },
+              "artifacts": {
+                "type": "array"
+              },
+              "evidence": {
+                "type": "array"
+              },
+              "operation": {},
+              "timestamp": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "preflight_mode",
+              "decision",
+              "execution_action",
+              "safe_for_agent"
+            ],
+            "additionalProperties": true
+          }
+        ]
+      }
     },
     {
-      "name": "coderifts.agent_tool_check",
-      "description": "Call when an API or tool schema changes and agents call those tools. Detects TOOL_RESULT_SHAPE_DRIFT, AGENT_PROTOCOL_DRIFT, ENDPOINT_REMOVED and REQUIRED_FIELD_ADDED, and returns per-pattern mitigation.",
+      "name": "verify_receipt",
+      "description": "Verify a CodeRifts signed chain-receipt you ALREADY HOLD: cryptographic\nauthenticity (signature + key id), body binding, and — when lifecycle indices\nare available — whether it is currently valid authorization (not expired,\nsuperseded, or revoked) for a stated operation/target.\n\nUse this when:\n- You already obtained a chain_receipt / receipt token from a prior preflight\n  (or CI artifact) and are about to act (merge/deploy) under that receipt.\n- A contract-gate or policy requires offline/online proof that the receipt is\n  authentic for this change before proceeding.\n- You must distinguish \"signature ok\" from \"currently authorized\" (stale or\n  superseded receipts must not be treated as live approval).\n\nDo not use when:\n- You do not have a receipt yet — call coderifts.preflight_change_set first.\n- You need a NEW decision for a changed base→head set — preflight again;\n  verify_receipt does not re-diff specs.\n- The receipt you hold binds a different operation or target than the one you\n  are about to perform — call coderifts.preflight_change_set for that operation;\n  verify_receipt cannot re-scope or re-issue a decision.\n- You only need human-readable history of an old decision_id without a receipt\n  token — use coderifts.get_decision_details.\n- The change set itself is unknown or incomplete — fix the change set and\n  preflight; do not \"verify\" a placeholder.\n\nInputs: receipt token (required); optional expected target_id, operation, and\nnow-skew policy hooks. Returns { valid, status, currently_authorized (bool|null),\nreason, payload, authz_* }. Branch on currently_authorized; null = not evaluated.",
       "input_schema": {
         "type": "object",
+        "description": "Two evaluation modes (schema-documented; no mode discriminator field). SIGNATURE: supply token only — signature + expiry; currently_authorized is null. AUTHORIZATION: also supply intended context (operation, environment, fingerprint, target_id, and/or audience) AND the body_hash-bound decision_result envelope so currently_authorized / authz_status / authz_reason can be evaluated. Token alone is always accepted; omitting the envelope when context fields are present yields a signature verdict plus fail-closed authorization (currently_authorized false), not a schema reject.",
         "properties": {
-          "before": { "type": "string", "description": "Base OpenAPI spec" },
-          "after": { "type": "string", "description": "Updated OpenAPI spec" }
+          "token": {
+            "type": "string",
+            "description": "The chain receipt token (base64url(body).base64url(signature))"
+          },
+          "operation": {
+            "type": "string",
+            "description": "Intended operation the receipt must authorize (conventional: merge|deploy|tool_call|publish). Triggers authorization evaluation when non-empty; supply decision_result for full scope binding."
+          },
+          "target_id": {
+            "type": "string",
+            "description": "Intended apply-site target the receipt must bind"
+          },
+          "environment": {
+            "type": "string",
+            "description": "Intended environment (e.g. production) — must match the receipt"
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Intended change fingerprint — must equal the receipt fp"
+          },
+          "audience": {
+            "type": "string",
+            "description": "Intended audience — must match the receipt"
+          },
+          "decision_result": {
+            "type": "object",
+            "description": "The body_hash-bound decision envelope (carries operation/target/decision). Required for a meaningful AUTHORIZATION evaluation of scope; without it, intended context alone fails closed on authorization (currently_authorized false) while signature status remains independent.",
+            "additionalProperties": true
+          }
         },
-        "required": ["before", "after"]
+        "required": [
+          "token"
+        ]
       },
-      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/diff" }
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "endpoint": {
+        "method": "POST",
+        "url": "https://app.coderifts.com/api/v1/verify-receipt"
+      },
+      "output_schema": {
+        "type": "object",
+        "description": "Receipt signature/status plus optional authorization layer. additionalProperties true: additive fields may appear and are not permission. Envelope compatibility when a decision_result is supplied: https://coderifts.com/schemas/decision-result.v1.consumer.json schema description (single source).",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "true iff status is VERIFIED_CURRENT or RETIRED_KEY_VALID_AT_ISSUE"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "VERIFIED_CURRENT",
+              "VERIFIED_EXPIRED",
+              "VERIFIED_WRONG_AUDIENCE",
+              "VERIFIED_WRONG_ENVIRONMENT",
+              "VERIFIED_SUPERSEDED",
+              "VERIFIED_SCOPE_MISMATCH",
+              "UNKNOWN_KEY",
+              "RETIRED_KEY_VALID_AT_ISSUE",
+              "INVALID_SIGNATURE",
+              "MALFORMED",
+              "UNSUPPORTED_VERSION",
+              "REGISTRY_UNREACHABLE"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payload": {
+            "type": "object"
+          },
+          "currently_authorized": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the receipt currently authorizes the intended operation/target/fp (§106). null means authorization could not be evaluated (e.g. no intended context) — not unauthorized and not authorized."
+          },
+          "authz_reason": {
+            "type": "string",
+            "description": "When currently_authorized=false: the deny reason (operation_mismatch, decision_not_allow, superseded, expired, target_mismatch, environment_mismatch, …)"
+          },
+          "authz_status": {
+            "type": "string",
+            "description": "Authorization-level status (VERIFIED_WRONG_ENVIRONMENT / VERIFIED_SUPERSEDED / VERIFIED_SCOPE_MISMATCH / …)"
+          },
+          "authz_state": {
+            "type": "string",
+            "description": "Lifecycle state from isCurrentlyAuthorized when authorization is evaluated (optional; omitted when currently_authorized is null)"
+          },
+          "authz_note": {
+            "type": "string",
+            "description": "Present when no intended context supplied: status reflects signature+expiry only"
+          }
+        },
+        "required": [
+          "valid",
+          "status",
+          "currently_authorized"
+        ],
+        "additionalProperties": true
+      }
     },
     {
-      "name": "coderifts.agent_readiness_score",
-      "description": "Call before wiring a new API or MCP manifest into an agent. Returns a 0-100 agent-readiness score with band and per-signal breakdown.",
+      "name": "get_decision_details",
+      "description": "Retrieve a PAST CodeRifts decision by decision_id (or fingerprint): full\nreport payload, breaking changes list, scores, and linked receipt metadata\nif stored.\n\nUse this when:\n- You have a decision_id (or fingerprint) from a previous preflight, PR\n  comment, or CI log and need to inspect or explain that past decision.\n- You are auditing why a prior ALLOW/WARN/BLOCK was issued.\n- You are NOT requesting a new analysis of current before/after specs.\n\nDo not use when:\n- You need a decision for the CURRENT uncommitted or PR head change set —\n  call coderifts.preflight_change_set with the current artifacts.\n- You hold a receipt token and only need cryptographic/lifecycle verification —\n  use coderifts.verify_receipt.\n- You have no decision_id/fingerprint — run preflight first to create one.\n\nInputs: at least one of decision_id (preferred) or fingerprint is required\n(empty {} is rejected by the server as INVALID_INPUT). Returns the stored\ndecision document or not_found.",
       "input_schema": {
         "type": "object",
         "properties": {
-          "spec": { "type": "string", "description": "OpenAPI spec or MCP manifest as YAML or JSON string" },
-          "spec_type": { "type": "string", "enum": ["openapi", "mcp"], "description": "Type of spec (default: openapi)" }
+          "decision_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The decision_id from a prior decision_result envelope. Provide this and/or fingerprint (at least one non-empty string required)."
+          },
+          "fingerprint": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A verdict fingerprint (sha256:...); returns the latest matching decision. Provide this and/or decision_id (at least one non-empty string required)."
+          }
         },
-        "required": ["spec"]
+        "minProperties": 1,
+        "additionalProperties": false
       },
-      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/agent-readiness-score" }
-    },
-    {
-      "name": "coderifts.registry_validate",
-      "description": "Call to health-check a whole MCP tool registry or a set of OpenAPI specs at once: schema consistency, auth coverage, deprecation, and breaking-change density.",
-      "input_schema": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "endpoint": {
+        "method": "POST",
+        "url": "https://app.coderifts.com/api/v1/decisions/lookup"
+      },
+      "output_schema": {
         "type": "object",
+        "description": "A stored CodeRifts decision: the original decision_result.v1 envelope + lookup meta. Retrieval-path control fields (safe_for_agent/execution_action/verdict_fingerprint/control_envelope) mirror the fresh preflight response and are present only when the stored envelope carries their source field. additionalProperties true: additive fields may appear and are not permission. Compatibility rule (single source): https://coderifts.com/schemas/decision-result.v1.consumer.json schema description.",
         "properties": {
-          "specs": { "type": "array", "items": { "type": "string" }, "description": "Array of OpenAPI specs or MCP manifests as YAML/JSON strings" }
+          "decision": {
+            "type": "string",
+            "enum": [
+              "ALLOW",
+              "WARN",
+              "REQUIRE_APPROVAL",
+              "BLOCK"
+            ]
+          },
+          "safe_for_agent": {
+            "type": "boolean"
+          },
+          "execution_action": {
+            "type": "string",
+            "enum": [
+              "CONTINUE",
+              "CONTINUE_WITH_MONITORING",
+              "REQUEST_APPROVAL",
+              "STOP"
+            ]
+          },
+          "verdict_fingerprint": {
+            "type": "string"
+          },
+          "control_envelope": {
+            "type": "object",
+            "description": "Control envelope (control/1.0) derived from the stored decision_result."
+          },
+          "required_action_core": {
+            "type": "object",
+            "description": "Branchable required-action core { type, reason_code, recheck_required } when present on the envelope."
+          },
+          "risk_score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "breaking_changes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "patterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "decision_result": {
+            "type": "object",
+            "description": "decision-result.v1 envelope (present when a chain receipt is available). Full schema: https://coderifts.com/schemas/decision-result.v1.consumer.json"
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "decision_id": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "retrieval_mode": {
+                "type": "string",
+                "enum": [
+                  "stored"
+                ]
+              }
+            },
+            "additionalProperties": true
+          }
         },
-        "required": ["specs"]
-      },
-      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/registry-validate" }
-    },
-    {
-      "name": "coderifts.agent_preflight",
-      "description": "Call before deploying changed agent tool schemas. Given tools before and after, returns which tools break, which workflows are affected, blast radius across the agent graph, and a deploy decision.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "tools_before": { "type": "array", "items": { "type": "object" }, "description": "Current tool schemas" },
-          "tools_after": { "type": "array", "items": { "type": "object" }, "description": "Updated tool schemas" },
-          "workflow_type": { "type": "string", "description": "Agent workflow type (optional)" }
-        },
-        "required": ["tools_before", "tools_after"]
-      },
-      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/agent/preflight" }
-    },
-    {
-      "name": "coderifts.traffic_analyze",
-      "description": "Call when you have live HTTP traffic but no updated spec. Infers behavioral drift from request/response samples to catch runtime contract changes.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "traffic_samples": { "type": "array", "description": "Array of HTTP traffic samples" },
-          "baseline_spec": { "type": "string", "description": "Current OpenAPI spec (optional)" }
-        },
-        "required": ["traffic_samples"]
-      },
-      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/traffic-analyze" }
-    },
-    {
-      "name": "coderifts.mcp_diff",
-      "description": "Call before publishing a new MCP manifest version. Compares two manifests for breaking changes in tool schemas, input/output contracts, auth, and tool availability.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "before": { "type": "string", "description": "Current MCP manifest as JSON string" },
-          "after": { "type": "string", "description": "Updated MCP manifest as JSON string" }
-        },
-        "required": ["before", "after"]
-      },
-      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/mcp-diff" }
-    },
-    {
-      "name": "coderifts.governance_health",
-      "description": "Call for an A-F governance grade of an API spec: policy violations, deprecation status, documentation coverage, and security findings.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "spec": { "type": "string", "description": "OpenAPI spec as YAML or JSON string" }
-        },
-        "required": ["spec"]
-      },
-      "endpoint": { "method": "POST", "url": "https://app.coderifts.com/api/v1/diff" }
+        "required": [
+          "decision_result",
+          "meta"
+        ],
+        "additionalProperties": true
+      }
     }
   ]
 }

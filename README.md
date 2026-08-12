@@ -65,25 +65,24 @@ Both return `200` with a `decision` field.
 
 ## Tools
 
+The hosted MCP server exposes **exactly three** tools (from live `tools/list` / generated `mcp.json`):
+
 | Tool | What it does |
 |------|--------------|
-| `preflight_check` | Analyze an API spec diff before merge. Returns risk score, break probability, blast radius, agent impact, economic cost, and a merge decision (ALLOW / WARN / REQUIRE_APPROVAL / BLOCK). |
-| `agent_tool_check` | Detect whether an API change breaks AI agent tool calling (TOOL_RESULT_SHAPE_DRIFT, AGENT_PROTOCOL_DRIFT, and more). Returns an agent-impact score and per-pattern consequence details. |
-| `agent_readiness_score` | Score an OpenAPI spec or MCP manifest for AI agent readiness (0–100) across nine signals, with band and breakdown. |
-| `registry_validate` | Validate a set of OpenAPI specs together: cross-spec endpoint collisions, schema naming conflicts, auth scope consistency, and unresolved $ref targets. |
-| `agent_preflight` | Pre-flight governance check for agent workflows. Given tool schemas before/after, returns which tools break, which workflows are affected, blast radius across the agent graph, and a deploy decision. |
-| `mcp_diff` | Compare two MCP manifests and detect breaking changes in tool schemas, input/output contracts, auth requirements, and tool availability. |
-| `governance_health` | Governance check for an API change (before/after OpenAPI specs): decision (ALLOW/WARN/REQUIRE_APPROVAL/BLOCK), risk_score, breaking_changes, patterns, policy_violations, security_findings, and evidence_quality. |
+| `preflight_change_set` | Preflight a complete base→head change set of contract artifacts. Returns risk score and breaking-change analysis. With `preflight_mode: "authorize"` (and `context.operation`), returns a governance decision (ALLOW / WARN / REQUIRE_APPROVAL / BLOCK) and may mint a signed chain-receipt. With `preflight_mode: "analyze"`, returns informational risk only (`may_execute: false`, no decision, no receipt). Requires `artifacts` + `preflight_mode`. |
+| `verify_receipt` | Verify a signed chain-receipt you already hold: signature authenticity, body binding, and (when lifecycle indices are available) whether it is currently authorized for a stated operation/target. Requires `token`. Does not re-diff specs. |
+| `get_decision_details` | Retrieve a past decision by `decision_id` (preferred) or `fingerprint`: stored report, breaking changes, scores, and linked receipt metadata if present. Not for a new analysis of the current change set. |
 
-Every tool returns the same **Decision Spec v1.0** envelope (`decision`, `risk_score`, `safe_for_agent`, `breaking_changes`, `patterns`, `requires_migration`, `evidence_quality`, `coderifts_version`, `timestamp`) so agent runtimes can branch on a stable contract.
+On the **authorize** path of `preflight_change_set`, the decision envelope includes fields such as `decision`, `execution_action`, `risk_score`, `safe_for_agent`, and related analysis fields so agent runtimes can branch on a stable contract. Prefer branching on `execution_action` when present.
 
 ---
 
 ## How agents use it
 
-1. Before merging an API change (or before an agent calls a tool), send the before/after spec to `preflight_check`.
-2. Read `decision`: `ALLOW` proceeds, `WARN` flags, `REQUIRE_APPROVAL` pauses for a human, `BLOCK` stops the merge / aborts the agent step.
-3. On `BLOCK`, the response explains the patterns, blast radius, and estimated incident cost, and provides mitigation templates.
+1. Before merging an API change (or before an agent acts on a contract change), call `preflight_change_set` with full before/after artifacts and `preflight_mode: "authorize"` (plus `context.operation`).
+2. Read `execution_action` / `decision`: CONTINUE/ALLOW proceeds, WARN flags, REQUIRE_APPROVAL pauses for a human, STOP/BLOCK stops the merge / aborts the agent step.
+3. If you already hold a receipt and only need to confirm it is still valid, call `verify_receipt` — do not re-preflight unless the change set or operation changed.
+4. To inspect a prior decision by id, call `get_decision_details`.
 
 Decision logic is deterministic: a single breaking change is never silently allowed. *Tests can pass and still ship a broken contract — CodeRifts checks the contract itself at PR time.*
 
