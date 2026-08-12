@@ -12,6 +12,29 @@ The market shows you *what* changed. CodeRifts tells you *how dangerous it is, w
 
 ---
 
+## Claude Code plugin
+
+Install the CodeRifts marketplace, then the `api-governance` plugin (MCP server + skill).
+Requires `CODERIFTS_API_KEY` for tool calls.
+
+```text
+/plugin marketplace add coderifts/api-governance
+/plugin install api-governance@coderifts
+```
+
+Local checkout (after clone):
+
+```text
+/plugin marketplace add .
+/plugin install api-governance@coderifts
+```
+
+The plugin wires the hosted MCP at `https://app.coderifts.com/mcp` and the
+`api-governance` skill. Tools exposed: `preflight_change_set`, `verify_receipt`,
+`get_decision_details` only.
+
+---
+
 ## MCP server
 
 CodeRifts runs as a hosted **Streamable HTTP** MCP server. Any MCP-compatible agent (Claude Desktop, Cursor, LangGraph, AutoGen, custom) can connect and run governance checks before tool calls or merges.
