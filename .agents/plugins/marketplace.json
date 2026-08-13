@@ -1,0 +1,20 @@
+{
+  "name": "coderifts",
+  "interface": {
+    "displayName": "CodeRifts"
+  },
+  "plugins": [
+    {
+      "name": "api-governance-openai",
+      "source": {
+        "source": "local",
+        "path": "./plugins/api-governance-openai"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

@@ -35,6 +35,39 @@ The plugin wires the hosted MCP at `https://app.coderifts.com/mcp` and the
 
 ---
 
+## OpenAI / Codex package
+
+Codex plugin package (measured OpenAI Codex layout: `.codex-plugin/plugin.json` +
+`.mcp.json` + `skills/` + `AGENTS.md`). Same hosted MCP and the **same three tools**
+as the Claude plugin — no fourth tool.
+
+| Path | Role | Source of truth |
+|------|------|-----------------|
+| `plugins/api-governance-openai/.codex-plugin/plugin.json` | Codex plugin manifest | Codex `plugin-json-spec` (scaffold skill) |
+| `plugins/api-governance-openai/.mcp.json` | Streamable HTTP MCP wiring | Same endpoint as Claude `.mcp.json` |
+| `plugins/api-governance-openai/skills/api-governance/SKILL.md` | Skill + tool list | Trigger wording from agent-setup rule; tool names/descriptions from generated `mcp.json` |
+| `plugins/api-governance-openai/AGENTS.md` | Agent rules file | **Generated** — `coderifts agent-setup` / `generate-agent-host-files.js` |
+| `plugins/api-governance-openai/openai-agent-instructions.md` | OpenAI Agents SDK instructions | **Generated** — same generator |
+| `.agents/plugins/marketplace.json` | Codex marketplace entry | Codex marketplace schema |
+
+Local checkout in Codex (team marketplace path):
+
+```text
+# From a clone of this repo, point Codex at .agents/plugins/marketplace.json
+# then install api-governance-openai (UI / plugin install — see Codex plugin docs).
+```
+
+Validate package consistency (manifest, tool parity, AGENTS.md empty-diff vs regeneration):
+
+```bash
+node scripts/validate-openai-package.js
+```
+
+Requires a local `~/coderifts-app` checkout (or `CODERIFTS_APP_ROOT`) for the AGENTS.md
+regeneration check. Directory listing / account submission steps are **not** automated here.
+
+---
+
 ## MCP server
 
 CodeRifts runs as a hosted **Streamable HTTP** MCP server. Any MCP-compatible agent (Claude Desktop, Cursor, LangGraph, AutoGen, custom) can connect and run governance checks before tool calls or merges.

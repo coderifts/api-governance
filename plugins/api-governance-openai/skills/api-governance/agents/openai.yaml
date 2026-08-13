@@ -1,0 +1,4 @@
+interface:
+  display_name: "CodeRifts API Governance"
+  short_description: "Preflight API/tool-contract changes before merge or ship"
+  default_prompt: "Call preflight_change_set before merge or deploy when a contract artifact changed; branch on execution_action only."
