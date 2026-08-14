@@ -68,6 +68,58 @@ regeneration check. Directory listing / account submission steps are **not** aut
 
 ---
 
+## GitHub Copilot kit
+
+Reference copies of the **generated** Copilot MCP configs + instructions (single source:
+`coderifts-app` generators). Same hosted MCP and the **same three tools** — no fourth tool.
+
+**Primary install (living command — prefer this over copying from the kit):**
+
+```bash
+npx coderifts copilot-setup
+# optional: --out <dir>   --check (drift-gate)   --force
+```
+
+Agent-host instructions (including `.github/copilot-instructions.md`) come from:
+
+```bash
+npx coderifts agent-setup
+```
+
+### Three Copilot surfaces (root keys differ)
+
+From the generated guide (`copilot/docs/copilot-mcp.md` — do not re-author this table):
+
+| Surface | Config location | Root key | Auth |
+|---------|-----------------|----------|------|
+| **VS Code / Copilot Chat** | `.vscode/mcp.json` | **`servers`** | `${input:coderifts_api_key}` + `inputs[]` |
+| **Copilot cloud agent + code review** | Repo **Settings → Copilot → MCP servers** (paste JSON) | **`mcpServers`** | Agents secret `COPILOT_MCP_CODERIFTS_API_KEY` in `headers` |
+| **Custom agent** (org/enterprise) | Agent profile `.md` YAML frontmatter | **`mcp-servers`** | `${{ secrets.COPILOT_MCP_CODERIFTS_API_KEY }}` |
+
+Tools allowlisted everywhere: `preflight_change_set`, `verify_receipt`, `get_decision_details`.
+
+### Vendored reference tree (`copilot/`)
+
+| Path | Role | Source of truth |
+|------|------|-----------------|
+| `copilot/.vscode/mcp.json` | VS Code / Copilot Chat | **Generated** — `generate-copilot-mcp.js` |
+| `copilot/copilot-cloud-agent-mcp.json` | Cloud agent paste JSON (`mcpServers`) | **Generated** — same |
+| `copilot/copilot-custom-agent-mcp.frontmatter.md` | Custom agent YAML frontmatter | **Generated** — same |
+| `copilot/docs/copilot-mcp.md` | Install guide + surfaces table | **Generated** — same |
+| `copilot/.github/copilot-instructions.md` | Copilot coding-agent instructions | **Generated** — `generate-agent-host-files.js` |
+| `copilot/SOURCE.md` | Provenance + re-sync commands | Packaging note (this repo) |
+
+Validate empty-diff vs regeneration + 3-tool discipline:
+
+```bash
+node scripts/validate-copilot-kit.js
+```
+
+Requires a local `~/coderifts-app` checkout (or `CODERIFTS_APP_ROOT`). The kit is a
+**communication / distribution mirror** — `npx coderifts copilot-setup` remains the install path.
+
+---
+
 ## MCP server
 
 CodeRifts runs as a hosted **Streamable HTTP** MCP server. Any MCP-compatible agent (Claude Desktop, Cursor, LangGraph, AutoGen, custom) can connect and run governance checks before tool calls or merges.
