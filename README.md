@@ -48,7 +48,21 @@ as the Claude plugin — no fourth tool.
 | `plugins/api-governance-openai/skills/api-governance/SKILL.md` | Skill + tool list | Trigger wording from agent-setup rule; tool names/descriptions from generated `mcp.json` |
 | `plugins/api-governance-openai/AGENTS.md` | Agent rules file | **Generated** — `coderifts agent-setup` / `generate-agent-host-files.js` |
 | `plugins/api-governance-openai/openai-agent-instructions.md` | OpenAI Agents SDK instructions | **Generated** — same generator |
+| `plugins/api-governance-openai/docs/openai-production-pattern.md` | **Production pattern (ID108)** — host dispatch loop with `executeOpenAIToolCall` | Hand-authored recipe on shipped `@coderifts/agent-guard` ≥ 6.4.0 |
+| `plugins/api-governance-openai/scripts/smoke-execute-openai-tool-call.mjs` | Offline smoke (ALLOW + BLOCK; no OpenAI key) | Real dispatcher + stub client |
 | `.agents/plugins/marketplace.json` | Codex marketplace entry | Codex marketplace schema |
+
+### Production pattern (function-calling apps)
+
+OpenAI’s model only **emits** `tool_call` JSON; **your app executes it**. Wire governance at
+that host loop — not as a Claude-style PreToolUse hook. Full steps + one canonical loop:
+
+→ [`plugins/api-governance-openai/docs/openai-production-pattern.md`](plugins/api-governance-openai/docs/openai-production-pattern.md)
+
+```bash
+# Offline smoke (needs ~/coderifts-agent-guard built, or CODERIFTS_AGENT_GUARD_ROOT)
+npm run smoke:openai-dispatch
+```
 
 Local checkout in Codex (team marketplace path):
 
@@ -60,7 +74,8 @@ Local checkout in Codex (team marketplace path):
 Validate package consistency (manifest, tool parity, AGENTS.md empty-diff vs regeneration):
 
 ```bash
-node scripts/validate-openai-package.js
+npm run validate:openai
+# or: node scripts/validate-openai-package.js
 ```
 
 Requires a local `~/coderifts-app` checkout (or `CODERIFTS_APP_ROOT`) for the AGENTS.md

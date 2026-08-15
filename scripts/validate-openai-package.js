@@ -206,6 +206,32 @@ if (fs.existsSync(claudeSkill)) {
   ok('Claude plugin still present (untouched path)', 'plugins/api-governance/…');
 }
 
+// ── 7. Production pattern (ID108) + offline smoke script ─────────────────────
+const recipePath = path.join(PKG, 'docs', 'openai-production-pattern.md');
+if (mustExist(recipePath, 'openai-production-pattern.md exists')) {
+  const body = fs.readFileSync(recipePath, 'utf8');
+  if (!body.includes('executeOpenAIToolCall')) {
+    fail('production pattern names executeOpenAIToolCall', 'missing dispatcher face');
+  } else {
+    ok('production pattern documents executeOpenAIToolCall');
+  }
+  if (!body.includes('calls_outside_guarded_path_invisible') && !body.includes('outside the guarded table')) {
+    fail('production pattern LIMITS / table honesty', 'missing guarded-table honesty line');
+  } else {
+    ok('production pattern states guarded-table honesty');
+  }
+}
+
+const smokePath = path.join(PKG, 'scripts', 'smoke-execute-openai-tool-call.mjs');
+if (mustExist(smokePath, 'smoke-execute-openai-tool-call.mjs exists')) {
+  const smoke = fs.readFileSync(smokePath, 'utf8');
+  if (!smoke.includes('executeOpenAIToolCall')) {
+    fail('smoke uses executeOpenAIToolCall', 'missing');
+  } else {
+    ok('smoke script references executeOpenAIToolCall');
+  }
+}
+
 console.log('');
 if (failed) {
   console.log(`RESULT: FAIL (${failed} check(s))`);
