@@ -1,0 +1,49 @@
+{
+  "name": "coderifts-api-governance",
+  "displayName": "CodeRifts API Governance",
+  "version": "1.0.0",
+  "description": "Deterministic, signed, fail-closed API-contract governance — not an AI compatibility scan. Preflight OpenAPI/GraphQL/gRPC/AsyncAPI/MCP/tool-schema change sets, verify Ed25519 chain-receipts, look up past decisions. Branch on a closed execution_action set (CONTINUE / CONTINUE_WITH_MONITORING / REQUEST_APPROVAL / STOP); unrecognised actions fail closed. Exactly three MCP tools.",
+  "author": {
+    "name": "CodeRifts",
+    "email": "peter@coderifts.com"
+  },
+  "homepage": "https://coderifts.com",
+  "repository": "https://github.com/coderifts/api-governance",
+  "license": "MIT",
+  "logo": "assets/logo.png",
+  "keywords": [
+    "coderifts",
+    "api-governance",
+    "breaking-change",
+    "openapi",
+    "mcp",
+    "preflight",
+    "receipt",
+    "fail-closed",
+    "deterministic"
+  ],
+  "category": "developer-tools",
+  "tags": [
+    "governance",
+    "api-contract",
+    "fail-closed",
+    "signed-receipt"
+  ],
+  "skills": "./skills/",
+  "rules": "./rules/",
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": "./mcp.json",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "CODERIFTS_API_KEY": {
+        "type": "string",
+        "title": "CodeRifts API key",
+        "description": "Bearer token from https://coderifts.com. Discovery (initialize, tools/list) works without it; tool calls that require auth need Authorization: Bearer <key>."
+      }
+    },
+    "required": [
+      "CODERIFTS_API_KEY"
+    ]
+  }
+}

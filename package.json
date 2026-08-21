@@ -1,12 +1,13 @@
 {
   "name": "api-governance",
   "private": true,
-  "description": "CodeRifts API governance distribution: Claude plugin, OpenAI/Codex package, Copilot kit mirrors",
+  "description": "CodeRifts API governance distribution: Claude plugin, OpenAI/Codex package, Copilot kit, Cursor plugin",
   "license": "MIT",
   "scripts": {
     "validate:openai": "node scripts/validate-openai-package.js",
     "smoke:openai-dispatch": "node plugins/api-governance-openai/scripts/smoke-execute-openai-tool-call.mjs",
-    "validate:copilot": "node scripts/validate-copilot-kit.js"
+    "validate:copilot": "node scripts/validate-copilot-kit.js",
+    "validate:cursor": "node scripts/validate-cursor-plugin.js"
   },
   "engines": {
     "node": ">=20"

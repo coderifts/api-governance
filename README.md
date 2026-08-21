@@ -35,6 +35,36 @@ The plugin wires the hosted MCP at `https://app.coderifts.com/mcp` and the
 
 ---
 
+## Cursor plugin
+
+Cursor Plugin package (measured Cursor layout: `.cursor-plugin/plugin.json` +
+`skills/` + `rules/` + `mcp.json` + `hooks/hooks.json`). Same hosted MCP and the
+**same three tools** as the Claude plugin — no fourth tool. Deterministic /
+signed / fail-closed — not an AI compatibility scan.
+
+| Path | Role | Source of truth |
+|------|------|-----------------|
+| `plugins/api-governance-cursor/.cursor-plugin/plugin.json` | Cursor Plugin manifest | [cursor/plugins `plugin.schema.json`](https://github.com/cursor/plugins/blob/main/schemas/plugin.schema.json) |
+| `plugins/api-governance-cursor/skills/coderifts-api-governance/SKILL.md` | Skill | Website `.well-known/agent-skills/coderifts-api-governance/SKILL.md` |
+| `plugins/api-governance-cursor/rules/coderifts.mdc` | Cursor rule | **Generated** — `generate-agent-host-files.js` |
+| `plugins/api-governance-cursor/mcp.json` | Streamable HTTP MCP wiring | Same endpoint as Claude `.mcp.json` (not the website tool-card) |
+| `plugins/api-governance-cursor/hooks/hooks.json` | PreToolUse adapter | Existing CLI `coderifts claude-hook` (ID912) |
+| `.cursor-plugin/marketplace.json` | Cursor marketplace entry | Cursor `marketplace.schema.json` |
+
+Validate:
+
+```bash
+npm run validate:cursor
+```
+
+**Peter — local Cursor load before publish:** symlink or add
+`plugins/api-governance-cursor` as a local plugin, exercise skill + rule + MCP +
+hook, then submit `https://github.com/coderifts/api-governance` at
+[cursor.com/marketplace/publish](https://cursor.com/marketplace/publish)
+(open-source, Cursor review).
+
+---
+
 ## OpenAI / Codex package
 
 Codex plugin package (measured OpenAI Codex layout: `.codex-plugin/plugin.json` +

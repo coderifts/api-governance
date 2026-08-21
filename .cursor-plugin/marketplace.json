@@ -1,0 +1,17 @@
+{
+  "name": "coderifts",
+  "owner": {
+    "name": "CodeRifts",
+    "email": "peter@coderifts.com"
+  },
+  "metadata": {
+    "description": "CodeRifts API governance plugins for Cursor — deterministic signed fail-closed contract preflight, not an AI compatibility scan."
+  },
+  "plugins": [
+    {
+      "name": "coderifts-api-governance",
+      "source": "plugins/api-governance-cursor",
+      "description": "Deterministic, signed, fail-closed API-contract governance — preflight change sets, verify Ed25519 receipts, look up past decisions. Exactly three MCP tools."
+    }
+  ]
+}

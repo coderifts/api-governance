@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "npx --yes coderifts claude-hook",
+        "matcher": "Write|Edit",
+        "failClosed": false
+      }
+    ]
+  }
+}
