@@ -1,23 +1,21 @@
 {
-  "$comment": "GENERATED tools[] from MCP_MANIFEST + OUTPUT_SCHEMAS (coderifts-app src/routes/mcp-streamable.js). Do not edit tools by hand; run: node scripts/generate-mcp-json.js --out <path-to-website>/mcp.json. Top-level registry fields (schema_version, name, display_name, description, contact, authentication) are hand-written / preserved. `version` is bound to SERVER_INFO.version. Protocol tools/list stays camelCase; this card uses snake_case input_schema / output_schema by conversion.",
-  "schema_version": "v1",
-  "name": "coderifts",
-  "display_name": "CodeRifts — API Governance",
-  "description": "Risk-aware API compatibility governance. Before merge: predicts whether an API change will cause a real production problem, who breaks, by what pattern, at what business cost, and whether blocking is justified.",
-  "version": "1.0.1",
-  "contact": {
-    "email": "peter@coderifts.com",
-    "url": "https://coderifts.com"
+  "$comment": "WIRE-FORMAT tools[] exactly as GET/POST https://app.coderifts.com/mcp tools/list serves it for the DEFAULT profile. This file exists to give surface-anchor.source_ref a public, third-party-fetchable pin target: you can verify the anchor from GitHub without calling us. It is NOT the registry card - mcp.json in this repo is that, and deliberately differs (snake_case input_schema/output_schema plus an endpoint field). Do not merge the two: a catalogue consuming mcp.json depends on that shape. Validate with scripts/validate-tools-wire.mjs.",
+  "schema": "coderifts.tools-wire.v1",
+  "profile": {
+    "endpoint": "https://app.coderifts.com/mcp",
+    "method": "tools/list",
+    "header_names": [],
+    "surface_params": {},
+    "id": "sha256:308ea7fa66f0aaa5"
   },
-  "authentication": {
-    "type": "bearer",
-    "description": "API key from https://coderifts.com — set as Authorization: Bearer <key>"
-  },
+  "digest_input": "sha256 over the canonical JSON of tools[]: object keys sorted lexicographically at every depth (arrays keep order), no whitespace, RAW UTF-8 with no \\uXXXX escaping. Python consumers must pass ensure_ascii=False.",
+  "tools_sha256": "sha256:db5cea2fbc69be86e514ea529ec1b1d2ed952bc086e49b85824eeb3d489967fd",
+  "tool_count": 3,
   "tools": [
     {
       "name": "preflight_change_set",
       "description": "Preflight a COMPLETE base→head change set of contract artifacts and return\nrisk score and breaking-change analysis — plus, on the AUTHORIZE path only, a governance decision\n(ALLOW / WARN / REQUIRE_APPROVAL / BLOCK) and a signed chain-receipt when applicable. ANALYZE\nreturns informational risk only: analysis_outcome, may_execute:false, no decision, no receipt.\n\nRequires a pending base→head (before/after) contract change you are about to\nact on (merge, deploy, publish, or register tools). No pending change set →\ndo not call this tool.\n\nUse this when:\n- You are about to merge, push, deploy, publish, or register/expose agent tools,\n  AND the change includes ≥1 contract artifact (OpenAPI/Swagger, GraphQL SDL,\n  gRPC/protobuf, AsyncAPI, MCP manifest, or agent tool schemas: type=agent_tools,\n  including before re-registering tools with a runtime).\n- You have (or can assemble) FULL base and head for every changed contract\n  artifact in this set — not a single-file subset when other contract files also\n  change.\n- You need a NEW decision for the CURRENT change; you do not already hold a\n  currently-valid receipt for this exact target/operation.\n- You hold a receipt for a different operation or target than the act you will\n  perform (e.g. ALLOW for merge, now deploying). A receipt authorizes ONE\n  operation: a merge receipt does not authorize a deploy. Run a NEW preflight\n  with context.operation set to that operation (deploy, publish); a\n  differently-scoped receipt is not reusable authorization and will fail at\n  the gate.\n\nDo not use when:\n- The change is documentation-only (README, guides, comments) with no contract\n  artifact content change — do not call any CodeRifts tool.\n- You already hold a signed receipt and only need to check it is authentic and\n  currently valid — use coderifts.verify_receipt instead.\n- You need details of a PREVIOUS decision by decision_id — use\n  coderifts.get_decision_details instead.\n- You want a static 0–100 \"agent readiness\" score for one OpenAPI/MCP file and\n  there is no pending base→head mutate — use coderifts.agent_readiness_score\n  (advanced / opt-in; not one of the three default tools). If that tool is not\n  in your available list, call none of the CodeRifts tools; do not substitute\n  preflight_change_set.\n- You cannot supply both before and after (or base and head) for the artifacts\n  that change — fix the change set first; do not invent empty before specs.\n\nInputs: list of artifacts, each with type, before, after (or equivalent), plus\noptional operation (merge|deploy|tool_call|publish), environment/stakes, and\ncontext. Opt-in derivation:\"server\" (proven tenant↔repo binding + context.repository\n+ base + head): omit artifacts[] — the server lists the contract-class set via the\nSCM provider for the proven binding (GitHub App Compare, or GitLab/Bitbucket Compare\nwith a per-request X-Coderifts-Scm-Token, never stored; completeness_mode\nSERVER_DERIVED). Default (flag absent) is unchanged. Returns decision,\nexecution_action, risk fields, and chain_receipt when issued.\n\nCHANGE SOURCE — EXACTLY ONE, ENFORCED AT THE ROUTE (400), NOT BY THIS SCHEMA.\nSupply either artifacts[] OR derivation:\"server\". All three of these are rejected\nwith HTTP 400 INVALID_INPUT, on analyze and on authorize alike:\n  • neither artifacts[] nor derivation      → \"artifacts must be a non-empty array\"\n  • authorize with context.operation but no change source → same 400\n  • artifacts[] together with derivation:\"server\" → \"derivation:\"server\" forbids\n    caller-supplied artifacts[] — one source of truth per request\"\nThis constraint is NOT expressible in the schema you are reading: a top-level\noneOf/allOf union is rejected by at least one major MCP client (measured), so the\nschema stays permissive and the route is the enforcement point. Do not read schema\nacceptance as request validity — verified live against these exact three shapes on\n2026-08-26, over REST and over MCP tools/call (isError:true on all three).\n\nMode (required): pass preflight_mode. Use \"analyze\" for informational risk only\n(returns analysis_outcome with may_execute:false, no decision/execution_action/\nsafe_for_agent, no receipt). Use \"authorize\" for the operation-bound path that can\nmint a receipt (requires context.operation: merge|deploy|publish|tool_call). Under\nDecision Spec 2.0 the mode is mandatory; omission is an error unless a legacy\ndecision_spec_version \"1.0\" pin is set.\n\nBranch on execution_action only (CONTINUE | CONTINUE_WITH_MONITORING | REQUEST_APPROVAL | STOP).\nOn non-CONTINUE authorize responses, control_envelope.next_agent_step is a structured\nremediation SUGGESTION the agent MAY follow (action, reason, resume_condition, then_call).\nIt is NOT permission and NOT a control-flow override — still branch on execution_action.\nOn CONTINUE / CONTINUE_WITH_MONITORING, next_agent_step is null (no remediation step).\nHuman tier remains human_report.next_steps_prose (same source; prose, not machine).",
-      "input_schema": {
+      "inputSchema": {
         "type": "object",
         "properties": {
           "artifacts": {
@@ -194,11 +192,7 @@
         "readOnlyHint": true,
         "openWorldHint": false
       },
-      "endpoint": {
-        "method": "POST",
-        "url": "https://app.coderifts.com/api/v1/preflight"
-      },
-      "output_schema": {
+      "outputSchema": {
         "type": "object",
         "oneOf": [
           {
@@ -1252,7 +1246,7 @@
     {
       "name": "verify_receipt",
       "description": "Verify a CodeRifts signed chain-receipt you ALREADY HOLD: cryptographic\nauthenticity (signature + key id), body binding, and — when lifecycle indices\nare available — whether it is currently valid authorization (not expired,\nsuperseded, or revoked) for a stated operation/target.\n\nUse this when:\n- You already obtained a chain_receipt / receipt token from a prior preflight\n  (or CI artifact) and are about to act (merge/deploy) under that receipt.\n- A contract-gate or policy requires offline/online proof that the receipt is\n  authentic for this change before proceeding.\n- You must distinguish \"signature ok\" from \"currently authorized\" (stale or\n  superseded receipts must not be treated as live approval).\n\nDo not use when:\n- You do not have a receipt yet — call coderifts.preflight_change_set first.\n- You need a NEW decision for a changed base→head set — preflight again;\n  verify_receipt does not re-diff specs.\n- The receipt you hold binds a different operation or target than the one you\n  are about to perform — call coderifts.preflight_change_set with\n  context.operation set to that operation (a merge receipt does not authorize\n  a deploy); verify_receipt cannot re-scope or re-issue a decision.\n- You only need human-readable history of an old decision_id without a receipt\n  token — use coderifts.get_decision_details.\n- The change set itself is unknown or incomplete — fix the change set and\n  preflight; do not \"verify\" a placeholder.\n\nInputs: receipt token (required); optional intended context (operation, environment,\nfingerprint, target_id, audience, repository/branch/pull_request, base/head) and the\nbody_hash-bound decision_result envelope. 30s clock-skew leeway on expiry; 0s for\ndestructive operations in production when the intended context declares them.\nReturns { valid, status, currently_authorized (bool|null), reason, payload, authz_* }.\nBranch on currently_authorized; null = not evaluated.\n\nWhen a decision envelope is also in hand (e.g. from a prior preflight), its\ncontrol_envelope.next_agent_step (if present) is structured remediation guidance\nthe agent MAY follow after a non-CONTINUE decision — still branch on\nexecution_action; next_agent_step is suggestion, not permission.",
-      "input_schema": {
+      "inputSchema": {
         "type": "object",
         "description": "Two evaluation modes (schema-documented; no mode discriminator field). SIGNATURE: supply token only — signature + expiry; currently_authorized is null. AUTHORIZATION: also supply intended context (operation, environment, fingerprint, target_id, audience, repository/branch/pull_request, and/or base/head) AND the body_hash-bound decision_result envelope so currently_authorized / authz_status / authz_reason can be evaluated. Token alone is always accepted; omitting the envelope when context fields are present yields a signature verdict plus fail-closed authorization (currently_authorized false), not a schema reject.",
         "properties": {
@@ -1448,11 +1442,7 @@
         "readOnlyHint": true,
         "openWorldHint": false
       },
-      "endpoint": {
-        "method": "POST",
-        "url": "https://app.coderifts.com/api/v1/verify-receipt"
-      },
-      "output_schema": {
+      "outputSchema": {
         "type": "object",
         "description": "Receipt signature/status plus optional authorization layer. additionalProperties true: additive fields may appear and are not permission. Envelope compatibility when a decision_result is supplied: https://coderifts.com/schemas/decision-result.v1.consumer.json schema description (single source).",
         "properties": {
@@ -1543,7 +1533,7 @@
     {
       "name": "get_decision_details",
       "description": "Retrieve a PAST CodeRifts decision by decision_id (or fingerprint): full\nreport payload, breaking changes list, scores, and linked receipt metadata\nif stored.\n\nUse this when:\n- You have a decision_id (or fingerprint) from a previous preflight, PR\n  comment, or CI log and need to inspect or explain that past decision.\n- You are auditing why a prior ALLOW/WARN/BLOCK was issued.\n- You are NOT requesting a new analysis of current before/after specs.\n\nDo not use when:\n- You need a decision for the CURRENT uncommitted or PR head change set —\n  call coderifts.preflight_change_set with the current artifacts.\n- You hold a receipt token and only need cryptographic/lifecycle verification —\n  use coderifts.verify_receipt.\n- You have no decision_id/fingerprint — run preflight first to create one.\n\nInputs: at least one of decision_id (preferred) or fingerprint is required\n(empty {} is rejected by the server as INVALID_INPUT). Returns the stored\ndecision document or not_found.\n\nScoping — fingerprint lookup returns only YOUR OWN decisions. A fingerprint is\nderived from content, not from an account, so two callers who preflight\nbyte-identical specs derive the same one; the lookup is therefore constrained\nto the decisions your credential can prove it owns.\n\nA decision that exists but is not yours returns the SAME not_found as one that\nwas never issued. This is deliberate: a distinguishable \"exists but forbidden\"\nwould confirm to any caller that a given content hash had been decided on by\nsomeone, which is the fact the scoping exists to withhold. Do not read\nnot_found as proof that no such decision exists anywhere.\n\nDecisions persisted without context.repository cannot currently be attributed\nto an account, and are not retrievable by fingerprint at all — not by their\nowner either. Retrieve those by decision_id, which is unchanged and unscoped.\nThis is a limitation of what older stored rows carry, not a property of the\nlookup: rows written from now on record the account directly, so the gap\nnarrows as older rows age out. If a fingerprint you expect returns not_found,\nuse the decision_id before concluding the decision is missing.\n\nWhen the stored envelope carries control fields, control_envelope.next_agent_step\nis structured remediation guidance the agent MAY follow for non-CONTINUE\nexecution_action values (null on CONTINUE*). Still branch on execution_action;\nnext_agent_step is a suggestion, not permission.",
-      "input_schema": {
+      "inputSchema": {
         "type": "object",
         "properties": {
           "decision_id": {
@@ -1564,11 +1554,7 @@
         "readOnlyHint": true,
         "openWorldHint": false
       },
-      "endpoint": {
-        "method": "POST",
-        "url": "https://app.coderifts.com/api/v1/decisions/lookup"
-      },
-      "output_schema": {
+      "outputSchema": {
         "type": "object",
         "description": "A stored CodeRifts decision: the original decision_result.v1 envelope + lookup meta. Retrieval-path control fields (safe_for_agent/execution_action/verdict_fingerprint/control_envelope) mirror the fresh preflight response and are present only when the stored envelope carries their source field. additionalProperties true: additive fields may appear and are not permission. Compatibility rule (single source): https://coderifts.com/schemas/decision-result.v1.consumer.json schema description.",
         "properties": {
