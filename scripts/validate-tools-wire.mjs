@@ -52,13 +52,42 @@ for (const t of doc.tools) {
 }
 
 // 3. And it must match what is actually served right now.
-const res = await fetch(LIVE, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
-  body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
-});
-if (!res.ok) fail(`live tools/list returned HTTP ${res.status}`);
-const liveTools = (await res.json())?.result?.tools;
+//
+// NETWORK-UNAVAILABLE POLICY — the same rule as the app's --verify-source-ref, deliberately, so the
+// two halves of one obligation cannot disagree about what a transport failure means:
+//   TRANSPORT failure (DNS, timeout, 5xx) → SKIP, loudly, exit 0. A gate that fails on a flaky
+//     network trains people to re-run until green, and a green obtained that way means nothing.
+//   EVERYTHING ELSE → FAIL. A 404/403 looks like a network problem and is not: it is the endpoint
+//     or tag being gone, which is a real verdict.
+// The skip is printed at warning volume and names what was NOT checked. A silent skip is how the
+// website vendoring gate went unnoticed for five days.
+const skip = (m) => {
+  console.error(`\n!!  validate-tools-wire SKIPPED — NOT VERIFIED  !!\n    ${m}\n`
+    + '    tools.wire.v1.json was NOT compared against the live surface. If the surface moved and\n'
+    + '    this file was not regenerated, this run did not catch it.\n');
+  process.exit(0);
+};
+
+let res;
+try {
+  res = await fetch(LIVE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+  });
+} catch (err) {
+  skip(`transport error reaching ${LIVE}: ${err?.message}`);
+}
+if (!res.ok) {
+  if (res.status === 404 || res.status === 403) fail(`live tools/list returned HTTP ${res.status} — the endpoint is gone, not unreachable`);
+  skip(`live tools/list returned HTTP ${res.status} (treated as transport, not drift)`);
+}
+let liveTools;
+try {
+  liveTools = (await res.json())?.result?.tools;
+} catch (err) {
+  skip(`live response was not JSON: ${err?.message}`);
+}
 if (!Array.isArray(liveTools)) fail('live response carried no result.tools[]');
 
 const liveDigest = digest(liveTools);

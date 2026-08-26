@@ -1,0 +1,44 @@
+# The validators existed; nothing ran them.
+#
+# This repo is CodeRifts' public distribution hub — mcp.json, the Copilot kit, the Codex/OpenAI
+# package, the Cursor plugin, and tools.wire.v1.json, which coderifts-app's surface-anchor.json
+# names as its source_ref pin target. Four validator scripts were written and none was wired: not
+# into package scripts, not into CI. That is how the repo reached five days stale while every file
+# in it looked reviewed.
+#
+# tools-wire is the one with an external obligation: the anchor's status text promises that every
+# surface change gets a NEW tag. If the live surface moves and this repo is not re-tagged, the
+# anchor points at an old surface while still looking authoritative. This workflow is the half of
+# that promise which lives here; the other half is the app's own --verify-source-ref gate.
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # The wire target can go stale without anything in THIS repo changing — the live surface moves
+  # elsewhere. Push/PR alone would never notice, so it is also checked on a schedule.
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Offline: these compare vendored files against each other and against the repo's own trees.
+      - name: Validate OpenAI/Codex package
+        run: npm run validate:openai
+      - name: Validate Copilot kit
+        run: npm run validate:copilot
+      - name: Validate Cursor plugin
+        run: npm run validate:cursor
+
+      # Network: fetches the live tools/list and compares. This is the source_ref obligation.
+      - name: Validate wire-format pin target against the live surface
+        run: npm run validate:tools-wire

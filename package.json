@@ -7,7 +7,9 @@
     "validate:openai": "node scripts/validate-openai-package.js",
     "smoke:openai-dispatch": "node plugins/api-governance-openai/scripts/smoke-execute-openai-tool-call.mjs",
     "validate:copilot": "node scripts/validate-copilot-kit.js",
-    "validate:cursor": "node scripts/validate-cursor-plugin.js"
+    "validate:cursor": "node scripts/validate-cursor-plugin.js",
+    "validate:tools-wire": "node scripts/validate-tools-wire.mjs",
+    "test": "npm run validate:openai && npm run validate:copilot && npm run validate:cursor && npm run validate:tools-wire"
   },
   "engines": {
     "node": ">=20"
