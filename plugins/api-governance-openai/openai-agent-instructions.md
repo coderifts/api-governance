@@ -14,7 +14,7 @@ When `execution_action` is REQUEST_APPROVAL or STOP, surface the detected patter
 
 `CONTINUE_WITH_MONITORING` requires a wired monitoring sink (`monitoringSinkWired`). It is not "proceed with caution" without monitoring.
 
-Do not call CodeRifts tools for a documentation-only change (README, guides, comments) with no contract artifact content change.
+Do not call `preflight_change_set` for: a documentation-only change (README, guides, comments) with no contract artifact content change; a static readiness score (a different capability, not a change-set decision); or to verify a receipt you already hold (that is `verify_receipt` — see the companion-tools rule).
 
 If you already hold a chain receipt and only need authenticity/lifecycle: `verify_receipt`. If you need a past decision by id: `get_decision_details`. Neither replaces preflight for a new change set.
 
@@ -28,7 +28,7 @@ For mutating tools, put only the guarded version in the agent's tool table; keep
 
 CodeRifts reports a governance decision and `execution_action`; it does not by itself block merges. Blocking requires separate repository configuration (required status checks, enforcement) that this rule file does not set.
 
-To act (mutate a contract, merge, deploy, or publish): call `preflight_change_set` with `preflight_mode` authorize. Analyze is informational (`may_execute` is always false) and is not permission. Read `execution_action` on the `decision_result` envelope.
+To act (mutate a contract, merge, deploy, or publish): call `preflight_change_set` with `preflight_mode` authorize. Analyze is informational — risk only, `may_execute` is always false — and is not permission. Read `execution_action` on the `decision_result` envelope.
 
 Before acting under a held receipt: call `verify_receipt` with the intended `context` (operation, environment, repository, branch, pull_request) for THIS attempt. Do not act on a receipt whose scope does not match.
 
