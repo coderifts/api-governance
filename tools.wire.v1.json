@@ -9,12 +9,12 @@
     "id": "sha256:308ea7fa66f0aaa5"
   },
   "digest_input": "sha256 over the canonical JSON of tools[]: object keys sorted lexicographically at every depth (arrays keep order), no whitespace, RAW UTF-8 with no \\uXXXX escaping. Python consumers must pass ensure_ascii=False.",
-  "tools_sha256": "sha256:3bca828ecf72b4206ac479cc3208885618b819239d8e54c194033502e905bf52",
+  "tools_sha256": "sha256:c3ec5f69ecdbcbb70ea113d249d6015da947e8a388df0ef670a0ff91b6a9a101",
   "tool_count": 3,
   "tools": [
     {
       "name": "preflight_change_set",
-      "description": "Use CodeRifts before merge, deploy, publish, or tool registration when a change set of contract artifacts modifies OpenAPI, GraphQL, protobuf, AsyncAPI, MCP manifests, or agent tool schemas. Do not call for documentation-only changes, static readiness scoring, or receipt verification. Use analyze for risk only; authorize requires context.operation for permission.",
+      "description": "Use this when: a change set of contract artifacts modifies OpenAPI, GraphQL, protobuf, AsyncAPI, MCP manifests, or agent tool schemas before merge, deploy, publish, or tool registration. Do not call for documentation-only changes, static readiness scoring, or receipt verification. Use analyze for risk only; authorize requires context.operation for permission. For receipt verification use coderifts.verify_receipt instead; for details of a past decision use coderifts.get_decision_details instead.",
       "inputSchema": {
         "type": "object",
         "properties": {
