@@ -1,4 +1,16 @@
 {
+  "$comment": "WIRE-FORMAT tools[] exactly as GET/POST https://app.coderifts.com/mcp tools/list serves it for the DEFAULT profile. This file exists to give surface-anchor.source_ref a public, third-party-fetchable pin target: you can verify the anchor from GitHub without calling us. It is NOT the registry card - mcp.json in this repo is that, and deliberately differs (snake_case input_schema/output_schema plus an endpoint field). Do not merge the two: a catalogue consuming mcp.json depends on that shape. Validate with scripts/validate-tools-wire.mjs.",
+  "schema": "coderifts.tools-wire.v1",
+  "profile": {
+    "endpoint": "https://app.coderifts.com/mcp",
+    "method": "tools/list",
+    "header_names": [],
+    "surface_params": {},
+    "id": "sha256:308ea7fa66f0aaa5"
+  },
+  "digest_input": "sha256 over the canonical JSON of tools[]: object keys sorted lexicographically at every depth (arrays keep order), no whitespace, RAW UTF-8 with no \\uXXXX escaping. Python consumers must pass ensure_ascii=False.",
+  "tools_sha256": "sha256:4871b5b961294ac2f00099141f560450184cae1bb94acdb836d3872d8ffc1738",
+  "tool_count": 3,
   "tools": [
     {
       "name": "preflight_change_set",
