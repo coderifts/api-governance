@@ -19,7 +19,7 @@ When `execution_action` is REQUEST_APPROVAL or STOP, surface the detected patter
 
 `CONTINUE_WITH_MONITORING` requires a wired monitoring sink (`monitoringSinkWired`). It is not "proceed with caution" without monitoring.
 
-Do not call CodeRifts tools for a documentation-only change (README, guides, comments) with no contract artifact content change.
+Do not call `preflight_change_set` for: a documentation-only change (README, guides, comments) with no contract artifact content change; a static readiness score (a different capability, not a change-set decision); or to verify a receipt you already hold (that is `verify_receipt` — see the companion-tools rule).
 
 If you already hold a chain receipt and only need authenticity/lifecycle: `verify_receipt`. If you need a past decision by id: `get_decision_details`. Neither replaces preflight for a new change set.
 
@@ -33,7 +33,7 @@ For mutating tools, put only the guarded version in the agent's tool table; keep
 
 CodeRifts reports a governance decision and `execution_action`; it does not by itself block merges. Blocking requires separate repository configuration (required status checks, enforcement) that this rule file does not set.
 
-To act (mutate a contract, merge, deploy, or publish): call `preflight_change_set` with `preflight_mode` authorize. Analyze is informational (`may_execute` is always false) and is not permission. Read `execution_action` on the `decision_result` envelope.
+To act (mutate a contract, merge, deploy, or publish): call `preflight_change_set` with `preflight_mode` authorize. Analyze is informational — risk only, `may_execute` is always false — and is not permission. Read `execution_action` on the `decision_result` envelope.
 
 Before acting under a held receipt: call `verify_receipt` with the intended `context` (operation, environment, repository, branch, pull_request) for THIS attempt. Do not act on a receipt whose scope does not match.
 
@@ -44,6 +44,8 @@ Commit / CAS evidence is a separate measurement (`commit_observation` on GuardOu
 If the host requests an execution grant (opt-in `include_execution_grant`), the grant is bound to operation + target + after-payload (`scope_hash`) and is short-lived — never reuse it after the after-payload changes.
 
 An ATOMIC-profile grant carries `state_nonce` and is single-use at the executor — if the executor has consumed the nonce, re-preflight; do not retry the same grant.
+
+Versions you may meet elsewhere: `cr.exec.v2` is the issued-token version for atomic execution, and `ENFORCING_STRICT_V1` is the versioned spelling of the strict profile. Neither is the default and neither is required by these rules — see `docs/grant-versions.md`.
 
 With a proven tenant↔repo binding you may request `derivation:"server"` instead of assembling `artifacts[]` yourself (`context.repository` + `context.base` + `context.head` required; caller-supplied artifacts are rejected on that path).
 

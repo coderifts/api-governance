@@ -116,3 +116,5 @@ perform — re-run `preflight_change_set` for the intended operation instead of 
   Snapshot-to-commit correspondence still requires a **host conditional write**
   (compare-and-swap on a version token) — the guard never writes and cannot verify a CAS occurred.
 - Merge enforcement depends on the repository's branch protection, not on any preflight response.
+
+Versions you may meet elsewhere: `cr.exec.v2` is the issued-token version for atomic execution, and `ENFORCING_STRICT_V1` is the versioned spelling of the strict profile. Neither is the default and neither is required by these rules — see `docs/grant-versions.md`.

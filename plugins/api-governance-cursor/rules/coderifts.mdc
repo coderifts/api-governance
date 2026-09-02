@@ -46,6 +46,8 @@ If the host requests an execution grant (opt-in `include_execution_grant`), the 
 
 An ATOMIC-profile grant carries `state_nonce` and is single-use at the executor — if the executor has consumed the nonce, re-preflight; do not retry the same grant.
 
+Versions you may meet elsewhere: `cr.exec.v2` is the issued-token version for atomic execution, and `ENFORCING_STRICT_V1` is the versioned spelling of the strict profile. Neither is the default and neither is required by these rules — see `docs/grant-versions.md`.
+
 With a proven tenant↔repo binding you may request `derivation:"server"` instead of assembling `artifacts[]` yourself (`context.repository` + `context.base` + `context.head` required; caller-supplied artifacts are rejected on that path).
 
 A commit is only proven when an executor attestation verifies (customer-held executor key, `cas_evidence: executor_attested`); otherwise say "authorized, commit not proven".
