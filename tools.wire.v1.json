@@ -9,7 +9,7 @@
     "id": "sha256:308ea7fa66f0aaa5"
   },
   "digest_input": "sha256 over the canonical JSON of tools[]: object keys sorted lexicographically at every depth (arrays keep order), no whitespace, RAW UTF-8 with no \\uXXXX escaping. Python consumers must pass ensure_ascii=False.",
-  "tools_sha256": "sha256:4871b5b961294ac2f00099141f560450184cae1bb94acdb836d3872d8ffc1738",
+  "tools_sha256": "sha256:54b7825485ca3949efa42f4441981211a7ab2e5524a1c69f456ac25352e6d281",
   "tool_count": 3,
   "tools": [
     {
@@ -126,6 +126,42 @@
           "state_nonce": {
             "type": "string",
             "description": "Optional ATOMIC-profile nonce. When include_execution_grant is true, copied into the signed grant as state_nonce (a separate signed field — NOT folded into scope_hash). Absent → BEARER grant (today's default). See docs/cr-exec-v1.md."
+          },
+          "grant_version": {
+            "type": "string",
+            "enum": [
+              "v1",
+              "v2"
+            ],
+            "description": "Grant envelope to mint when include_execution_grant is true. Default absent = v1."
+          },
+          "tenant_id": {
+            "type": "string",
+            "description": "Tenant the grant is issued under (cr.exec.v2). Defaults to \"default\" when absent."
+          },
+          "executor_id": {
+            "type": "string",
+            "description": "Identity of the executor the grant is bound to (cr.exec.v2)."
+          },
+          "adapter_id": {
+            "type": "string",
+            "description": "Adapter the executor will apply the change with, e.g. fs, postgres, git (cr.exec.v2)."
+          },
+          "target_uri": {
+            "type": "string",
+            "description": "Target the grant is bound to (cr.exec.v2). Falls back to context.target_uri, then to a repository/head-derived value."
+          },
+          "expected_state_token": {
+            "type": "string",
+            "description": "State token the executor expects to observe at apply time (cr.exec.v2). Signed as a separate field; empty string when absent."
+          },
+          "audience": {
+            "type": "string",
+            "description": "Requester identity for the decision envelope. Accepted here; the server-derived audience wins when both are present."
+          },
+          "policy_hash": {
+            "type": "string",
+            "description": "Policy identity the grant is issued under (cr.exec.v2). Bound into the signed grant when supplied."
           },
           "idempotency_key": {
             "type": "string",
