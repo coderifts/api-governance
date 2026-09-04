@@ -9,7 +9,7 @@
     "id": "sha256:308ea7fa66f0aaa5"
   },
   "digest_input": "sha256 over the canonical JSON of tools[]: object keys sorted lexicographically at every depth (arrays keep order), no whitespace, RAW UTF-8 with no \\uXXXX escaping. Python consumers must pass ensure_ascii=False.",
-  "tools_sha256": "sha256:6d853d3379d2994d2f9a6e6f7a465421ffe663c9fafefa231cf1edc9b633f38f",
+  "tools_sha256": "sha256:dc86678e81da8befd0c5c4b9ff6ab5d57bbab4f407f6800108f62b74c246abd9",
   "tool_count": 3,
   "tools": [
     {
@@ -105,6 +105,10 @@
                 "type": "string",
                 "description": "Optional apply-site target (IntentContext parity; not folded into the bundle fingerprint)"
               },
+              "target_uri": {
+                "type": "string",
+                "description": "Optional apply-site URI the cr.exec.v2 grant binds (handler fallback: input.target_uri, then context.target_uri, then repository/head-derived). Distinct from target_id."
+              },
               "fingerprint": {
                 "type": "string",
                 "description": "Optional change fingerprint (IntentContext parity; not folded into the bundle fingerprint)"
@@ -133,8 +137,9 @@
               "v1",
               "v2"
             ],
-            "default": "v2",
-            "description": "Grant envelope to mint when include_execution_grant is true. MIGRATION: omitting this yields cr.exec.v1 until 2026-09-18 and cr.exec.v2 on and after it; the response carries grant_version_deprecation while the old default is still in effect. An explicit value always wins, before and after the cutoff — pin \"v1\" to keep the current behaviour with no code change on the date."
+            "x-coderifts-effective-default": "v1",
+            "x-coderifts-default-changes-at": "2026-09-18",
+            "description": "Grant envelope to mint when include_execution_grant is true. Omitting this yields cr.exec.v1 until 2026-09-18 and cr.exec.v2 on and after it (see x-coderifts-effective-default / x-coderifts-default-changes-at). The response meta.grant_version is the version actually issued. An explicit value always wins — pin \"v1\" to keep current behaviour with no code change on the date."
           },
           "tenant_id": {
             "type": "string",
