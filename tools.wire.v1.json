@@ -9,7 +9,7 @@
     "id": "sha256:308ea7fa66f0aaa5"
   },
   "digest_input": "sha256 over the canonical JSON of tools[]: object keys sorted lexicographically at every depth (arrays keep order), no whitespace, RAW UTF-8 with no \\uXXXX escaping. Python consumers must pass ensure_ascii=False.",
-  "tools_sha256": "sha256:85543e84b1c321c77e8b42b084a17e92ea93221febd2917ff611d0220f6ab9ed",
+  "tools_sha256": "sha256:6d853d3379d2994d2f9a6e6f7a465421ffe663c9fafefa231cf1edc9b633f38f",
   "tool_count": 3,
   "tools": [
     {
@@ -133,7 +133,8 @@
               "v1",
               "v2"
             ],
-            "description": "Grant envelope to mint when include_execution_grant is true. Default absent = v1."
+            "default": "v2",
+            "description": "Grant envelope to mint when include_execution_grant is true. MIGRATION: omitting this yields cr.exec.v1 until 2026-09-18 and cr.exec.v2 on and after it; the response carries grant_version_deprecation while the old default is still in effect. An explicit value always wins, before and after the cutoff — pin \"v1\" to keep the current behaviour with no code change on the date."
           },
           "tenant_id": {
             "type": "string",
