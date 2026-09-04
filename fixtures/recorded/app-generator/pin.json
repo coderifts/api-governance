@@ -1,0 +1,73 @@
+{
+  "schema": "cr.api-governance.recorded-app-generator.v1",
+  "producer": {
+    "name": "coderifts-app",
+    "repo": "https://github.com/coderifts/app",
+    "commit": "c97f13ca8b0b26df9c89f59d9e520529c4e07cc6",
+    "generated_last_touched": "6a44047",
+    "generator": [
+      "scripts/generate-copilot-mcp.js",
+      "scripts/generate-agent-host-files.js"
+    ]
+  },
+  "proves": "The published kit files match this recording of expected generator output.",
+  "does_not_prove": "That coderifts-app as it stands now still emits these bytes. LIVE re-derives and fails if this recording is stale.",
+  "artifacts": [
+    {
+      "path": "cursor/coderifts.mdc",
+      "role": "cursor-rule",
+      "sha256": "22a18225e70afa86ee041697a0e021474d7be08b36e8c7f3e261ab177deb0318",
+      "bytes": 5129,
+      "app_path": "generated/agent-host/.cursor/rules/coderifts.mdc"
+    },
+    {
+      "path": "copilot/.vscode/mcp.json",
+      "role": "copilot-vscode",
+      "sha256": "cec51ba85e89ca37e6979f71047bc38863635e6bdc5ae6d76aa46da870f517c3",
+      "bytes": 587,
+      "app_path": "generated/copilot-mcp/.vscode/mcp.json"
+    },
+    {
+      "path": "copilot/copilot-cloud-agent-mcp.json",
+      "role": "copilot-cloud",
+      "sha256": "765910e9ac9641ed9218f4048b902035ea1ec946e7fe54e2fd948a1e94f50dec",
+      "bytes": 328,
+      "app_path": "generated/copilot-mcp/copilot-cloud-agent-mcp.json"
+    },
+    {
+      "path": "copilot/copilot-custom-agent-mcp.frontmatter.md",
+      "role": "copilot-frontmatter",
+      "sha256": "f71177783c9cb3abd727ee161199de98270b07e8ddfeee007f499ca1e00b8c08",
+      "bytes": 1215,
+      "app_path": "generated/copilot-mcp/copilot-custom-agent-mcp.frontmatter.md"
+    },
+    {
+      "path": "copilot/docs/copilot-mcp.md",
+      "role": "copilot-docs",
+      "sha256": "f0d70ede5d634e7a5e6dc7da2d2ceea2e3ce6d15c405536b28659588c36e5191",
+      "bytes": 4001,
+      "app_path": "generated/copilot-mcp/docs/copilot-mcp.md"
+    },
+    {
+      "path": "copilot/.github/copilot-instructions.md",
+      "role": "copilot-instructions",
+      "sha256": "63e83e379e961c19ded76911a685c79ddb7e2112b3417b1624576e0987a3cfbf",
+      "bytes": 4781,
+      "app_path": "generated/agent-host/.github/copilot-instructions.md"
+    },
+    {
+      "path": "openai/AGENTS.md",
+      "role": "openai-agents",
+      "sha256": "d589766a768bb9994484651d09bb5af6e7765ab155c98f56d11e571b3c998b8d",
+      "bytes": 4761,
+      "app_path": "generated/agent-host/AGENTS.md"
+    },
+    {
+      "path": "openai/openai-agent-instructions.md",
+      "role": "openai-instructions",
+      "sha256": "91adac7e03bc080ae818be6a441a4dfff6215a5be4168838b9ca4007e165bc8c",
+      "bytes": 5036,
+      "app_path": "generated/agent-host/openai-agent-instructions.md"
+    }
+  ]
+}

@@ -9,7 +9,7 @@
     "validate:copilot": "node scripts/validate-copilot-kit.js",
     "validate:cursor": "node scripts/validate-cursor-plugin.js",
     "validate:tools-wire": "node scripts/validate-tools-wire.mjs",
-    "test": "npm run validate:openai && npm run validate:copilot && npm run validate:cursor && npm run validate:tools-wire"
+    "test": "node --test test/*.test.js && npm run validate:openai && npm run validate:copilot && npm run validate:cursor && npm run validate:tools-wire"
   },
   "engines": {
     "node": ">=20"

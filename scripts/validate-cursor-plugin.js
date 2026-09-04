@@ -9,13 +9,16 @@
  * (required: name; additionalProperties: false).
  *
  * Env:
- *   CODERIFTS_APP_ROOT      — coderifts-app (default: ~/coderifts-app)
+ *   CODERIFTS_APP_ROOT      — coderifts-app (default: ~/coderifts-app). When present,
+ *                             the generated-rule check is LIVE. When absent, RECORDED
+ *                             against fixtures/recorded/app-generator (weaker, named).
  *   CODERIFTS_WEBSITE_DIR   — coderifts-website (default: ~/coderifts-website)
  *   API_GOVERNANCE_ROOT     — this repo (default: dirname(script)/..)
  */
 
 const fs = require('fs');
 const path = require('path');
+const rec = require('../lib/recorded-app-generator');
 
 const ROOT = process.env.API_GOVERNANCE_ROOT
   ? path.resolve(process.env.API_GOVERNANCE_ROOT)
@@ -224,13 +227,39 @@ if (fs.existsSync(websiteSkill) && fs.existsSync(skillPath)) {
 }
 
 const generatedRule = path.join(APP, 'generated', 'agent-host', '.cursor', 'rules', 'coderifts.mdc');
-if (fs.existsSync(generatedRule) && fs.existsSync(rulePath)) {
-  const a = fs.readFileSync(generatedRule);
-  const b = fs.readFileSync(rulePath);
-  if (!a.equals(b)) fail('rules/coderifts.mdc drift vs generated agent-host', generatedRule);
-  else ok('rules/coderifts.mdc byte-identical to generated/agent-host');
-} else {
-  ok('rule generated drift skipped (no CODERIFTS_APP_ROOT)');
+let pin;
+try {
+  pin = rec.loadPin();
+} catch (e) {
+  fail('RECORDED snapshot', e.message);
+  pin = null;
+}
+const cursorLive = fs.existsSync(generatedRule);
+if (pin && fs.existsSync(rulePath)) {
+  const kitBytes = fs.readFileSync(rulePath);
+  const snapBytes = rec.snapshotBytes('cursor/coderifts.mdc');
+  if (cursorLive) {
+    const liveBytes = fs.readFileSync(generatedRule);
+    if (!kitBytes.equals(liveBytes)) {
+      fail('rules/coderifts.mdc drift vs generated agent-host', generatedRule);
+    } else {
+      ok('rules/coderifts.mdc byte-identical to generated/agent-host', rec.modeBanner('LIVE'));
+    }
+    if (!snapBytes.equals(liveBytes)) {
+      fail(
+        'RECORDED snapshot STALE vs live generated rule',
+        'regenerate fixtures/recorded/app-generator/cursor/coderifts.mdc from coderifts-app',
+      );
+    } else {
+      ok('RECORDED cursor rule matches live generated', rec.modeBanner('LIVE'));
+    }
+  } else {
+    if (!kitBytes.equals(snapBytes)) {
+      fail('rules/coderifts.mdc drift vs RECORDED snapshot', rec.snapshotPath('cursor/coderifts.mdc'));
+    } else {
+      ok('rules/coderifts.mdc byte-identical to RECORDED snapshot', rec.modeBanner('RECORDED'));
+    }
+  }
 }
 
 const inRepoLicense = path.join(PKG, 'LICENSE');
@@ -239,7 +268,7 @@ if (mustExist(inRepoLicense, 'LICENSE')) ok('LICENSE resolves');
 if (mustExist(inRepoLogo, 'assets/logo.png')) ok('logo resolves');
 
 if (failed) {
-  console.log(`\nvalidate-cursor-plugin: ${failed} failure(s)`);
+  console.log(`\nvalidate-cursor-plugin: ${failed} failure(s) ${rec.modeBanner(cursorLive ? 'LIVE' : 'RECORDED')}`);
   process.exit(1);
 }
-console.log('\nvalidate-cursor-plugin: GREEN');
+console.log(`\nvalidate-cursor-plugin: GREEN ${rec.modeBanner(cursorLive ? 'LIVE' : 'RECORDED')}`);

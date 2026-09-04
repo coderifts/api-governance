@@ -5,7 +5,9 @@
  * Validate the api-governance/copilot/ kit: vendored GENERATED files stay
  * byte-identical to coderifts-app generator output, and 3-tool discipline holds.
  *
- * Pattern sibling of scripts/validate-openai-package.js (CODERIFTS_APP_ROOT env).
+ * LIVE when CODERIFTS_APP_ROOT (default ~/coderifts-app) has the generators.
+ * RECORDED against fixtures/recorded/app-generator when it does not (weaker, named).
+ * Missing/corrupt snapshot exits 1 — no silent skip.
  *
  * Usage:
  *   node scripts/validate-copilot-kit.js
@@ -15,6 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const rec = require('../lib/recorded-app-generator');
 
 const ROOT = process.env.API_GOVERNANCE_ROOT
   ? path.resolve(process.env.API_GOVERNANCE_ROOT)
@@ -31,31 +34,36 @@ const CANONICAL_TOOLS = [
 ];
 const MCP_URL = 'https://app.coderifts.com/mcp';
 
-/** Paths under copilot/ → relative path under coderifts-app generated/ */
+/** Paths under copilot/ → app generated/ + RECORDED snapshot rel. */
 const VENDORED = [
   {
     kit: '.vscode/mcp.json',
     app: 'generated/copilot-mcp/.vscode/mcp.json',
+    snapshot: 'copilot/.vscode/mcp.json',
     generator: 'scripts/generate-copilot-mcp.js',
   },
   {
     kit: 'copilot-cloud-agent-mcp.json',
     app: 'generated/copilot-mcp/copilot-cloud-agent-mcp.json',
+    snapshot: 'copilot/copilot-cloud-agent-mcp.json',
     generator: 'scripts/generate-copilot-mcp.js',
   },
   {
     kit: 'copilot-custom-agent-mcp.frontmatter.md',
     app: 'generated/copilot-mcp/copilot-custom-agent-mcp.frontmatter.md',
+    snapshot: 'copilot/copilot-custom-agent-mcp.frontmatter.md',
     generator: 'scripts/generate-copilot-mcp.js',
   },
   {
     kit: 'docs/copilot-mcp.md',
     app: 'generated/copilot-mcp/docs/copilot-mcp.md',
+    snapshot: 'copilot/docs/copilot-mcp.md',
     generator: 'scripts/generate-copilot-mcp.js',
   },
   {
     kit: '.github/copilot-instructions.md',
     app: 'generated/agent-host/.github/copilot-instructions.md',
+    snapshot: 'copilot/.github/copilot-instructions.md',
     generator: 'scripts/generate-agent-host-files.js',
   },
 ];
@@ -175,70 +183,84 @@ if (!mustExist(KIT, 'copilot/ kit directory')) {
 }
 ok('copilot/ kit present', KIT);
 
-// ── Generators --check (optional soft signal) + byte-identity ────────────────
-const genCopilot = path.join(APP, 'scripts', 'generate-copilot-mcp.js');
-const genHost = path.join(APP, 'scripts', 'generate-agent-host-files.js');
-if (!mustExist(genCopilot, 'generate-copilot-mcp.js') || !mustExist(genHost, 'generate-agent-host-files.js')) {
-  console.log('RESULT: FAIL (need CODERIFTS_APP_ROOT)');
+// ── Byte-identity: LIVE vs generator, or RECORDED vs pinned snapshot ─────────
+let pin;
+try {
+  pin = rec.loadPin();
+} catch (e) {
+  fail('RECORDED snapshot', e.message);
+  console.log('RESULT: FAIL (need RECORDED snapshot)');
   process.exit(1);
 }
 
-// Prefer comparing to a fresh regeneration in a temp dir (empty-diff vs live generator),
-// matching validate-openai-package.js AGENTS.md check — not only on-disk generated/.
-const os = require('os');
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-copilot-kit-'));
-const r1 = spawnSync(process.execPath, [genCopilot, '--out', tmp], {
-  encoding: 'utf8',
-  env: { ...process.env, LOG_LEVEL: 'silent' },
-});
-if (r1.status !== 0) {
-  fail('regenerate copilot-mcp', (r1.stderr || r1.stdout || '').slice(0, 500));
+const LIVE = rec.generatorsPresent();
+const genCopilot = path.join(APP, 'scripts', 'generate-copilot-mcp.js');
+const genHost = path.join(APP, 'scripts', 'generate-agent-host-files.js');
+let tmp;
+let tmpHost;
+if (LIVE) {
+  const os = require('os');
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-copilot-kit-'));
+  const r1 = spawnSync(process.execPath, [genCopilot, '--out', tmp], {
+    encoding: 'utf8',
+    env: { ...process.env, LOG_LEVEL: 'silent' },
+  });
+  if (r1.status !== 0) {
+    fail('regenerate copilot-mcp', (r1.stderr || r1.stdout || '').slice(0, 500));
+  } else {
+    ok('regenerated copilot-mcp into temp', `${tmp} ${rec.modeBanner('LIVE')}`);
+  }
+  tmpHost = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-agent-host-'));
+  const r2 = spawnSync(process.execPath, [genHost, '--out', tmpHost], {
+    encoding: 'utf8',
+    env: { ...process.env, LOG_LEVEL: 'silent' },
+  });
+  if (r2.status !== 0) {
+    fail('regenerate agent-host', (r2.stderr || r2.stdout || '').slice(0, 500));
+  } else {
+    ok('regenerated agent-host into temp', `${tmpHost} ${rec.modeBanner('LIVE')}`);
+  }
 } else {
-  ok('regenerated copilot-mcp into temp', tmp);
+  ok('app generators absent — comparing kit to RECORDED snapshot', rec.modeBanner('RECORDED'));
 }
 
-const tmpHost = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-agent-host-'));
-const r2 = spawnSync(process.execPath, [genHost, '--out', tmpHost], {
-  encoding: 'utf8',
-  env: { ...process.env, LOG_LEVEL: 'silent' },
-});
-if (r2.status !== 0) {
-  fail('regenerate agent-host', (r2.stderr || r2.stdout || '').slice(0, 500));
-} else {
-  ok('regenerated agent-host into temp', tmpHost);
-}
-
-// Map kit path → fresh regenerated path
 function freshPath(entry) {
   if (entry.generator.includes('copilot')) {
-    // generate-copilot-mcp --out writes the same relative layout as generated/copilot-mcp/
     return path.join(tmp, entry.kit);
   }
-  // agent-host: FORMAT_PATHS copilot_instructions → .github/copilot-instructions.md
   return path.join(tmpHost, '.github/copilot-instructions.md');
 }
 
 for (const entry of VENDORED) {
   const kitFile = path.join(KIT, entry.kit);
   if (!mustExist(kitFile, `kit ${entry.kit}`)) continue;
-  const fresh = freshPath(entry);
-  // copilot generator --out layout: may nest under outDir directly with same rel paths
-  let compareTo = fresh;
-  if (!fs.existsSync(compareTo) && entry.generator.includes('copilot')) {
-    // Some generators write under outDir with paths relative to generated/copilot-mcp root
-    compareTo = path.join(tmp, entry.kit);
-  }
-  if (!fs.existsSync(compareTo)) {
-    // Fall back to app on-disk generated/ (still single-source artifact)
-    compareTo = path.join(APP, entry.app);
-  }
-  if (!mustExist(compareTo, `source for ${entry.kit}`)) continue;
-  const a = fs.readFileSync(kitFile);
-  const b = fs.readFileSync(compareTo);
-  if (!a.equals(b)) {
-    fail(`${entry.kit} empty-diff`, `kit=${a.length} source=${b.length} (${compareTo})`);
+  const kitBytes = fs.readFileSync(kitFile);
+  const snapBytes = rec.snapshotBytes(entry.snapshot);
+  if (LIVE) {
+    let compareTo = freshPath(entry);
+    if (!fs.existsSync(compareTo) && entry.generator.includes('copilot')) {
+      compareTo = path.join(tmp, entry.kit);
+    }
+    if (!fs.existsSync(compareTo)) {
+      compareTo = path.join(APP, entry.app);
+    }
+    if (!mustExist(compareTo, `source for ${entry.kit}`)) continue;
+    const liveBytes = fs.readFileSync(compareTo);
+    if (!kitBytes.equals(liveBytes)) {
+      fail(`${entry.kit} empty-diff`, `kit=${kitBytes.length} source=${liveBytes.length} (${compareTo})`);
+    } else {
+      ok(`${entry.kit} empty-diff vs generation`, `${kitBytes.length} bytes ${rec.modeBanner('LIVE')}`);
+    }
+    if (!snapBytes.equals(liveBytes)) {
+      fail(
+        `RECORDED snapshot STALE vs live generation (${entry.kit})`,
+        'regenerate fixtures/recorded/app-generator from coderifts-app',
+      );
+    }
+  } else if (!kitBytes.equals(snapBytes)) {
+    fail(`${entry.kit} empty-diff vs RECORDED snapshot`, rec.snapshotPath(entry.snapshot));
   } else {
-    ok(`${entry.kit} empty-diff vs generation`, `${a.length} bytes`);
+    ok(`${entry.kit} empty-diff vs RECORDED snapshot`, `${kitBytes.length} bytes ${rec.modeBanner('RECORDED')}`);
   }
 }
 
@@ -349,8 +371,8 @@ if (fs.existsSync(path.join(ROOT, 'plugins', 'api-governance-openai', '.codex-pl
 
 console.log('');
 if (failed) {
-  console.log(`RESULT: FAIL (${failed} check(s))`);
+  console.log(`RESULT: FAIL (${failed} check(s)) ${rec.modeBanner(LIVE ? 'LIVE' : 'RECORDED')}`);
   process.exit(1);
 }
-console.log('RESULT: ALL PASS');
+console.log(`RESULT: ALL PASS ${rec.modeBanner(LIVE ? 'LIVE' : 'RECORDED')}`);
 process.exit(0);

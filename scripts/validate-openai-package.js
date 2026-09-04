@@ -25,6 +25,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const rec = require('../lib/recorded-app-generator');
 
 const ROOT = process.env.API_GOVERNANCE_ROOT
   ? path.resolve(process.env.API_GOVERNANCE_ROOT)
@@ -145,10 +146,16 @@ if (mustExist(registryMcp, 'repo mcp.json exists')) {
 }
 
 // ── 4–5. AGENTS.md + openai-agent-instructions empty-diff vs regeneration ────
+// LIVE when the generator exists; RECORDED against the vendored snapshot otherwise.
+let openaiPin;
+try {
+  openaiPin = rec.loadPin();
+} catch (e) {
+  fail('RECORDED snapshot', e.message);
+}
 const genScript = path.join(APP, 'scripts', 'generate-agent-host-files.js');
-if (!fs.existsSync(genScript)) {
-  fail('agent-setup generator present', `missing ${genScript}`);
-} else {
+const openaiLive = fs.existsSync(genScript);
+if (openaiLive) {
   const tmp = fs.mkdtempSync(path.join(require('os').tmpdir(), 'cr-agent-host-'));
   const r = spawnSync(process.execPath, [genScript, '--out', tmp], {
     encoding: 'utf8',
@@ -157,10 +164,11 @@ if (!fs.existsSync(genScript)) {
   if (r.status !== 0) {
     fail('regenerate agent-host files', (r.stderr || r.stdout || '').slice(0, 400));
   } else {
-    ok('regenerated agent-host files', tmp);
+    ok('regenerated agent-host files', `${tmp} ${rec.modeBanner('LIVE')}`);
     for (const rel of ['AGENTS.md', 'openai-agent-instructions.md']) {
       const pkgFile = path.join(PKG, rel);
       const genFile = path.join(tmp, rel);
+      const snapRel = `openai/${rel}`;
       if (!mustExist(pkgFile, `${rel} in package`)) continue;
       if (!mustExist(genFile, `${rel} regenerated`)) continue;
       const a = fs.readFileSync(pkgFile);
@@ -168,8 +176,30 @@ if (!fs.existsSync(genScript)) {
       if (!a.equals(b)) {
         fail(`${rel} empty-diff vs regeneration`, `byte length pkg=${a.length} gen=${b.length}`);
       } else {
-        ok(`${rel} empty-diff vs agent-setup generation`, `${a.length} bytes`);
+        ok(`${rel} empty-diff vs agent-setup generation`, `${a.length} bytes ${rec.modeBanner('LIVE')}`);
       }
+      if (openaiPin) {
+        const snap = rec.snapshotBytes(snapRel);
+        if (!snap.equals(b)) {
+          fail(
+            `RECORDED snapshot STALE vs live generation (${rel})`,
+            'regenerate fixtures/recorded/app-generator/openai from coderifts-app',
+          );
+        }
+      }
+    }
+  }
+} else if (openaiPin) {
+  ok('app generator absent — comparing package files to RECORDED snapshot', rec.modeBanner('RECORDED'));
+  for (const rel of ['AGENTS.md', 'openai-agent-instructions.md']) {
+    const pkgFile = path.join(PKG, rel);
+    if (!mustExist(pkgFile, `${rel} in package`)) continue;
+    const a = fs.readFileSync(pkgFile);
+    const snap = rec.snapshotBytes(`openai/${rel}`);
+    if (!a.equals(snap)) {
+      fail(`${rel} empty-diff vs RECORDED snapshot`, rec.snapshotPath(`openai/${rel}`));
+    } else {
+      ok(`${rel} empty-diff vs RECORDED snapshot`, `${a.length} bytes ${rec.modeBanner('RECORDED')}`);
     }
   }
 }
@@ -234,8 +264,8 @@ if (mustExist(smokePath, 'smoke-execute-openai-tool-call.mjs exists')) {
 
 console.log('');
 if (failed) {
-  console.log(`RESULT: FAIL (${failed} check(s))`);
+  console.log(`RESULT: FAIL (${failed} check(s)) ${rec.modeBanner(openaiLive ? 'LIVE' : 'RECORDED')}`);
   process.exit(1);
 }
-console.log('RESULT: ALL PASS');
+console.log(`RESULT: ALL PASS ${rec.modeBanner(openaiLive ? 'LIVE' : 'RECORDED')}`);
 process.exit(0);

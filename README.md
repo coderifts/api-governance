@@ -57,6 +57,11 @@ Validate:
 npm run validate:cursor
 ```
 
+The generated-rule check is **LIVE** when `CODERIFTS_APP_ROOT` (default `~/coderifts-app`)
+has `generated/agent-host/.cursor/rules/coderifts.mdc`, and **RECORDED** against
+`fixtures/recorded/app-generator` when it does not (weaker, named). A missing or
+corrupt snapshot still exits 1 — no silent skip.
+
 **Peter — local Cursor load before publish:** symlink or add
 `plugins/api-governance-cursor` as a local plugin, exercise skill + rule + MCP +
 hook, then submit `https://github.com/coderifts/api-governance` at
@@ -108,8 +113,10 @@ npm run validate:openai
 # or: node scripts/validate-openai-package.js
 ```
 
-Requires a local `~/coderifts-app` checkout (or `CODERIFTS_APP_ROOT`) for the AGENTS.md
-regeneration check. Directory listing / account submission steps are **not** automated here.
+`AGENTS.md` regeneration is **LIVE** when `~/coderifts-app` (or `CODERIFTS_APP_ROOT`) exists,
+and **RECORDED** against `fixtures/recorded/app-generator` when it does not (weaker, named).
+A missing or corrupt snapshot still exits 1. Directory listing / account submission steps are
+**not** automated here.
 
 ---
 
@@ -160,8 +167,10 @@ Validate empty-diff vs regeneration + 3-tool discipline:
 node scripts/validate-copilot-kit.js
 ```
 
-Requires a local `~/coderifts-app` checkout (or `CODERIFTS_APP_ROOT`). The kit is a
-**communication / distribution mirror** — `npx coderifts copilot-setup` remains the install path.
+Empty-diff vs regeneration is **LIVE** when `CODERIFTS_APP_ROOT` has the generators, and
+**RECORDED** against `fixtures/recorded/app-generator` when it does not (weaker, named).
+A missing or corrupt snapshot still exits 1. The kit is a **communication / distribution
+mirror** — `npx coderifts copilot-setup` remains the install path.
 
 ---
 
