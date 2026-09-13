@@ -1,0 +1,25 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.coderifts/api-governance",
+  "description": "Contract-change authorization for AI agents. Signed receipts verify offline.",
+  "version": "1.0.2",
+  "websiteUrl": "https://coderifts.com",
+  "repository": {
+    "url": "https://github.com/coderifts/api-governance",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://app.coderifts.com/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer <API key from https://coderifts.com>. X-API-Key is also accepted.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
