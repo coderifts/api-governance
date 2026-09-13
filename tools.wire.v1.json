@@ -1,7 +1,7 @@
 {
   "schema": "coderifts.tools-wire.v1",
   "tool_count": 3,
-  "tools_sha256": "sha256:af868f5d3fbbb1f1be6cc8a36ca70ea13caf1f64640895ce3a2986905ed53114",
+  "tools_sha256": "sha256:c2f5bbccea3cb1394a8aff623d654a94266faa83f93dda0936acc2a7ed5494cf",
   "tools": [
     {
       "name": "preflight_change_set",
@@ -286,7 +286,7 @@
               },
               "detected_patterns": {
                 "type": "array",
-                "description": "GOVERNANCE detector detail rows (src/change-patterns.js; validated by decision-spec-fields.js). Row shape measured live: name, severity, description, consequence, affected_path, affected_field; optional side (request|response) on ENUM_NARROWING. Names ⊆ patterns (not equality). Agent-detector names may appear only in patterns. Free-text fields are untrusted.",
+                "description": "GOVERNANCE detector detail rows, emitted by the pattern detectors and validated against the decision-spec field contract before they leave the server. Row shape measured live: name, severity, description, consequence, affected_path, affected_field; optional side (request|response) on ENUM_NARROWING. Names ⊆ patterns (not equality). Agent-detector names may appear only in patterns. Free-text fields are untrusted.",
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
@@ -365,7 +365,7 @@
               },
               "severity_summary": {
                 "type": "object",
-                "description": "Bundle severity axes (src/change-set.js severity_summary). Distinct axes, not contradictory. Measured keys: diff_severity, governance_severity, policy_effect, note.",
+                "description": "Bundle severity axes, computed once per change set. Distinct axes, not contradictory. Measured keys: diff_severity, governance_severity, policy_effect, note.",
                 "additionalProperties": false,
                 "properties": {
                   "diff_severity": {
@@ -388,7 +388,7 @@
               "decision_basis": {},
               "analysis": {
                 "type": "object",
-                "description": "Tier-2 analysis mirror (src/response-envelope.js buildAnalysisTier / attachControlSurface). Dual-write of the flat analysis fields present on the verdict, plus remediations[]. PROPERTIES ARE GENERATED from ANALYSIS_TIER_FIELDS + remediations by scripts/generate-analysis-tier-schema.js — do not hand-edit them. OPEN BY DESIGN: additionalProperties stays TRUE and this is not an oversight. The fields above are copied conditionally, so which of them appear depends on the input — a verdict with no PII findings simply omits pii_findings. Closing this object would turn every future analysis field into a breaking change that fails inside the consumer, and would reject exactly the verdict paths that no one sampled when the union was built. Declared, not closed: you can now see what you may get, and you must still tolerate more.",
+                "description": "Tier-2 analysis mirror, assembled by the response builder alongside the control surface. Dual-write of the flat analysis fields present on the verdict, plus remediations[]. PROPERTIES ARE GENERATED — do not hand-edit them. OPEN BY DESIGN: additionalProperties stays TRUE and this is not an oversight. The fields above are copied conditionally, so which of them appear depends on the input — a verdict with no PII findings simply omits pii_findings. Closing this object would turn every future analysis field into a breaking change that fails inside the consumer, and would reject exactly the verdict paths that no one sampled when the union was built. Declared, not closed: you can now see what you may get, and you must still tolerate more.",
                 "properties": {
                   "breaking_changes": {
                     "type": "integer"
@@ -515,7 +515,7 @@
               },
               "human_report": {
                 "type": "object",
-                "description": "Human-readable report tier (src/response-envelope.js buildHumanReport / analyze v2 stub). Measured keys: summary, breaking_highlights, suggestions, next_steps_prose.",
+                "description": "Human-readable report tier, assembled by the response builder; analyze returns a reduced form. Measured keys: summary, breaking_highlights, suggestions, next_steps_prose.",
                 "additionalProperties": false,
                 "properties": {
                   "summary": {
@@ -740,7 +740,7 @@
               },
               "detected_patterns": {
                 "type": "array",
-                "description": "GOVERNANCE detector detail rows (src/change-patterns.js; validated by decision-spec-fields.js). Row shape measured live: name, severity, description, consequence, affected_path, affected_field; optional side (request|response) on ENUM_NARROWING. Names ⊆ patterns (not equality). Agent-detector names may appear only in patterns. Free-text fields are untrusted.",
+                "description": "GOVERNANCE detector detail rows, emitted by the pattern detectors and validated against the decision-spec field contract before they leave the server. Row shape measured live: name, severity, description, consequence, affected_path, affected_field; optional side (request|response) on ENUM_NARROWING. Names ⊆ patterns (not equality). Agent-detector names may appear only in patterns. Free-text fields are untrusted.",
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
@@ -819,7 +819,7 @@
               },
               "severity_summary": {
                 "type": "object",
-                "description": "Bundle severity axes (src/change-set.js severity_summary). Distinct axes, not contradictory. Measured keys: diff_severity, governance_severity, policy_effect, note.",
+                "description": "Bundle severity axes, computed once per change set. Distinct axes, not contradictory. Measured keys: diff_severity, governance_severity, policy_effect, note.",
                 "additionalProperties": false,
                 "properties": {
                   "diff_severity": {
@@ -842,7 +842,7 @@
               "decision_basis": {},
               "analysis": {
                 "type": "object",
-                "description": "Tier-2 analysis mirror (src/response-envelope.js buildAnalysisTier / attachControlSurface). Dual-write of the flat analysis fields present on the verdict, plus remediations[]. PROPERTIES ARE GENERATED from ANALYSIS_TIER_FIELDS + remediations by scripts/generate-analysis-tier-schema.js — do not hand-edit them. OPEN BY DESIGN: additionalProperties stays TRUE and this is not an oversight. The fields above are copied conditionally, so which of them appear depends on the input — a verdict with no PII findings simply omits pii_findings. Closing this object would turn every future analysis field into a breaking change that fails inside the consumer, and would reject exactly the verdict paths that no one sampled when the union was built. Declared, not closed: you can now see what you may get, and you must still tolerate more.",
+                "description": "Tier-2 analysis mirror, assembled by the response builder alongside the control surface. Dual-write of the flat analysis fields present on the verdict, plus remediations[]. PROPERTIES ARE GENERATED — do not hand-edit them. OPEN BY DESIGN: additionalProperties stays TRUE and this is not an oversight. The fields above are copied conditionally, so which of them appear depends on the input — a verdict with no PII findings simply omits pii_findings. Closing this object would turn every future analysis field into a breaking change that fails inside the consumer, and would reject exactly the verdict paths that no one sampled when the union was built. Declared, not closed: you can now see what you may get, and you must still tolerate more.",
                 "properties": {
                   "breaking_changes": {
                     "type": "integer"
@@ -969,7 +969,7 @@
               },
               "human_report": {
                 "type": "object",
-                "description": "Human-readable report tier (src/response-envelope.js buildHumanReport / analyze v2 stub). Measured keys: summary, breaking_highlights, suggestions, next_steps_prose.",
+                "description": "Human-readable report tier, assembled by the response builder; analyze returns a reduced form. Measured keys: summary, breaking_highlights, suggestions, next_steps_prose.",
                 "additionalProperties": false,
                 "properties": {
                   "summary": {
@@ -991,7 +991,7 @@
               },
               "execution_grant": {
                 "type": "string",
-                "description": "Opt-in cr.exec.v1 execution grant (PHASE-0). Issued only when include_execution_grant is true on authorize. Short-lived mutation-bound sibling of chain_receipt; never unsigned. Optional inner state_nonce (ATOMIC profile) is additive and is NOT in scope_hash. See docs/cr-exec-v1.md / docs/cr-exec-attest-v1.md."
+                "description": "Opt-in cr.exec.v1 execution grant (PHASE-0). Issued only when include_execution_grant is true on authorize. Short-lived mutation-bound sibling of chain_receipt; never unsigned. Optional inner state_nonce (ATOMIC profile) is additive and is NOT in scope_hash."
               },
               "chain_status": {
                 "type": "string"
@@ -1521,7 +1521,7 @@
           },
           "correlation_id": {
             "type": "string",
-            "description": "Route-owned trace id (ID828); always a non-empty string on 200"
+            "description": "Route-owned trace id, set by the route itself rather than by correlation middleware; always a non-empty string on 200"
           },
           "payload": {
             "type": "object"
