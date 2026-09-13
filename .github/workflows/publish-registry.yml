@@ -1,0 +1,92 @@
+# Publishing to the MCP Registry, from CI, because the manual path cannot prove what CI does not
+# have to.
+#
+# MEASURED: `mcp-publisher login github && publish` returns 403 for the io.github.coderifts
+# namespace. The cause is not the account's role — orgs/coderifts/memberships/zsobpeter-code reports
+# role=admin, state=active. The cause is that the manual login cannot READ that role: the registry's
+# GitHub App is not installed on the org, so it cannot query read:org, and the org namespace is
+# granted only to a caller whose Owner role it can verify.
+#
+# The OIDC path does not need the role at all. From the registry source
+# (internal/api/handlers/v0/auth/github_oidc.go, buildPermissions):
+#
+#     ResourcePattern: fmt.Sprintf("io.github.%s/*", claims.RepositoryOwner)
+#
+# The grant is derived from the OIDC token's `repository_owner` claim — who owns the repository the
+# workflow runs in — with no membership lookup anywhere in that function. This repository is owned
+# by the coderifts org, so a token minted here carries publish rights for io.github.coderifts/*.
+# That is the whole reason this file exists rather than a runbook step.
+#
+# WHY workflow_dispatch AND NOT A TAG PUSH. The registry guide triggers on `push: tags: v*`. That
+# is right for a repo whose tags mean releases. It is wrong here: this repo's tags are SURFACE
+# DIGEST pins (surface-af868f5d), minted whenever the live tools[] surface moves, and re-tagging is
+# an obligation the anchor already imposes. Wiring publish to tag pushes would republish the server
+# every time the surface was re-pinned, which is a different event with a different meaning.
+# Publishing is a decision; it gets its own button.
+#
+# WHO CAN PRESS IT. There is no stored secret here, but that is not the same as no exposure: any
+# run of this workflow can mint a token that may publish — and OVERWRITE — ANY server under
+# io.github.coderifts/*, not only this one. workflow_dispatch requires repo write access, so the
+# blast radius is "everyone who can push to this repo". To narrow it to an explicit human approval,
+# add `environment: mcp-registry-publish` to the job AFTER creating that environment with a
+# required reviewer. Do not add the key first: per the registry's own guide, declaring an
+# environment that does not exist yet makes GitHub auto-create it WITH NO PROTECTION RULES, which
+# reads as a control while being none.
+name: publish-registry
+
+on:
+  workflow_dispatch:
+
+# Two publishes racing would have the registry decide which server.json wins. Let the queue decide.
+concurrency:
+  group: publish-registry
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      # The one that matters. Without it the OIDC token is never minted and `login github-oidc`
+      # fails with "Authentication failed" — the registry guide's first troubleshooting row.
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # No official Action exists for this — measured: modelcontextprotocol/registry serves 404 for
+      # both action.yml and action.yaml. The guide's own install step is a release download, so
+      # that is what this is.
+      #
+      # `latest` is deliberate, not laziness: the guide's troubleshooting says an "invalid audience"
+      # failure means the binary is too old for the deployment and the fix is to re-run this step.
+      # Pinning a version here would turn that self-healing step into a manual bump.
+      #
+      # --fail is added to the guide's line. Without it, curl pipes a 404's HTML body into tar and
+      # the run dies inside the archive reader instead of at the download.
+      - name: Install mcp-publisher
+        run: |
+          curl --fail -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          ./mcp-publisher --version
+
+      # The namespace the token will carry is io.github.<repository_owner>/*. If server.json asks
+      # for anything else, the registry answers 403 — the same opaque failure this workflow exists
+      # to get away from. Checking it here names the mismatch locally, before a token is minted.
+      - name: Check server.json asks for this owner's namespace
+        run: |
+          NAME=$(jq -r '.name' server.json)
+          EXPECTED="io.github.${{ github.repository_owner }}/"
+          echo "server.json name : $NAME"
+          echo "OIDC will grant  : ${EXPECTED}*"
+          case "$NAME" in
+            "$EXPECTED"*) echo "namespace matches" ;;
+            *) echo "::error::server.json name '$NAME' is outside the namespace this workflow can publish to (${EXPECTED}*)"; exit 1 ;;
+          esac
+
+      - name: Authenticate to MCP Registry
+        run: ./mcp-publisher login github-oidc
+
+      # No PATH argument: publish defaults to ./server.json, which is where this repo keeps it.
+      # No --registry either — that flag is login-only, and publish would read it as the file path.
+      - name: Publish server to MCP Registry
+        run: ./mcp-publisher publish
