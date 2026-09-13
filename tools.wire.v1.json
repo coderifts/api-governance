@@ -1,7 +1,7 @@
 {
   "schema": "coderifts.tools-wire.v1",
   "tool_count": 3,
-  "tools_sha256": "sha256:c2f5bbccea3cb1394a8aff623d654a94266faa83f93dda0936acc2a7ed5494cf",
+  "tools_sha256": "sha256:4c3d2bcc7c1c00fe7cd9ee5e6df6ada47652bf9b3537a1a9d82815142afa5b38",
   "tools": [
     {
       "name": "preflight_change_set",
@@ -336,7 +336,7 @@
               },
               "breaking_changes_details": {
                 "type": "array",
-                "description": "Per-change IR/detail rows from the engine (src/blast/diff-to-change.js maps these). Measured row keys: type, path, method, field, severity, description. Distinct from breaking_changes (integer count).",
+                "description": "Per-change IR/detail rows, mapped from the engine's change IR. Measured row keys: type, path, method, field, severity, description. Distinct from breaking_changes (integer count).",
                 "items": {
                   "type": "object",
                   "additionalProperties": true,
@@ -575,7 +575,7 @@
               "blast_radius": {
                 "type": "object",
                 "additionalProperties": false,
-                "description": "ID27 additive COUNTS (not a score). Pure function of the change-set + request graphs. Not in the verdict_fingerprint preimage.",
+                "description": "Additive COUNTS (not a score). Pure function of the change-set + request graphs. Not in the verdict_fingerprint preimage.",
                 "required": [
                   "endpoints",
                   "fields",
@@ -790,7 +790,7 @@
               },
               "breaking_changes_details": {
                 "type": "array",
-                "description": "Per-change IR/detail rows from the engine (src/blast/diff-to-change.js maps these). Measured row keys: type, path, method, field, severity, description. Distinct from breaking_changes (integer count).",
+                "description": "Per-change IR/detail rows, mapped from the engine's change IR. Measured row keys: type, path, method, field, severity, description. Distinct from breaking_changes (integer count).",
                 "items": {
                   "type": "object",
                   "additionalProperties": true,
@@ -1098,7 +1098,7 @@
                   },
                   "blast_radius": {
                     "type": "object",
-                    "description": "ID27 additive COUNTS (not a score). Not permission.",
+                    "description": "Additive COUNTS (not a score). Not permission.",
                     "properties": {
                       "endpoints": {
                         "type": "integer",
@@ -1176,7 +1176,7 @@
               "blast_radius": {
                 "type": "object",
                 "additionalProperties": false,
-                "description": "ID27 additive COUNTS (not a score). Pure function of the change-set + request graphs. Not in the verdict_fingerprint preimage.",
+                "description": "Additive COUNTS (not a score). Pure function of the change-set + request graphs. Not in the verdict_fingerprint preimage.",
                 "required": [
                   "endpoints",
                   "fields",
@@ -1437,7 +1437,7 @@
               },
               "blast_radius": {
                 "type": "object",
-                "description": "ID27 additive COUNTS (not a score). Not permission.",
+                "description": "Additive COUNTS (not a score). Not permission.",
                 "properties": {
                   "endpoints": {
                     "type": "integer",
@@ -1801,7 +1801,7 @@
               },
               "blast_radius": {
                 "type": "object",
-                "description": "ID27 additive COUNTS (not a score). Not permission.",
+                "description": "Additive COUNTS (not a score). Not permission.",
                 "properties": {
                   "endpoints": {
                     "type": "integer",
