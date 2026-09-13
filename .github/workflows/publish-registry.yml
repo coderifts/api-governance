@@ -34,6 +34,11 @@
 # reads as a control while being none.
 name: publish-registry
 
+# The WORKFLOW-level default, and it is empty on purpose. Without this line any job added here
+# later inherits the repository default instead of declaring its own, which is how a second job
+# quietly gets more than the publish job below was allowed. Each job states what it needs.
+permissions: {} # workflow default: nothing; every job declares its own
+
 on:
   workflow_dispatch:
 
@@ -45,37 +50,127 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+
+    # ── THE environment: KEY GOES HERE, AND ONLY AFTER THE ENVIRONMENT EXISTS ────────────────
+    #
+    #   environment: mcp-registry-publish
+    #
+    # Do NOT paste that line in first. Per the registry's own guide, declaring an environment that
+    # does not exist yet makes GitHub AUTO-CREATE it with NO protection rules — it would read as a
+    # control while being none, which is worse than the honest absence below.
+    #
+    # Create it first: Settings -> Environments -> New environment -> mcp-registry-publish, add a
+    # Required reviewer, and restrict its deployment branches to the default branch. Then add the
+    # key above, and every publish pauses for a named human.
+    #
+    # UNTIL THEN, the blast radius is stated rather than implied: this job can mint a token that
+    # publishes to — and overwrites — anything under io.github.coderifts/*, and workflow_dispatch
+    # needs only write access. So today that is "everyone who can push to this repo".
     permissions:
       # The one that matters. Without it the OIDC token is never minted and `login github-oidc`
       # fails with "Authentication failed" — the registry guide's first troubleshooting row.
-      id-token: write
-      contents: read
+      id-token: write # mints the OIDC token; without it login github-oidc fails
+      # Read-only, and only because checkout needs it. This job pushes nothing and writes nothing
+      # back to the repository.
+      contents: read # checkout only; this job never writes back
 
     steps:
-      - uses: actions/checkout@v4
+      # SHA-pinned, not tag-pinned. `actions/checkout@v4` is a MOVING major tag: whoever can push
+      # to that repository can point it at different code, and this job holds an OIDC token that
+      # publishes to the whole io.github.coderifts/* namespace. The tag stays in the comment
+      # because a SHA is unreadable and a reader still needs to know which release this is.
+      #
+      # MEASURED 2026-09-13: actions/checkout@v4 resolves to 11d5960a, released as v4.4.0.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # This job pushes nothing. Leaving the token in .git/config would hand every later step
+          # a credential none of them needs.
+          persist-credentials: false
 
       # No official Action exists for this — measured: modelcontextprotocol/registry serves 404 for
       # both action.yml and action.yaml. The guide's own install step is a release download, so
-      # that is what this is.
+      # that is what this is. What follows departs from the guide in one way, deliberately.
       #
-      # `latest` is deliberate, not laziness: the guide's troubleshooting says an "invalid audience"
-      # failure means the binary is too old for the deployment and the fix is to re-run this step.
-      # Pinning a version here would turn that self-healing step into a manual bump.
+      # ── WHY THIS IS PINNED AND VERIFIED, AND WHAT IT COSTS ──────────────────────────────────
       #
-      # --fail is added to the guide's line. Without it, curl pipes a 404's HTML body into tar and
-      # the run dies inside the archive reader instead of at the download.
+      # This step used to fetch `releases/latest` and pipe it straight into tar. The comment here
+      # argued FOR that: the guide's troubleshooting says an "invalid audience" failure means the
+      # binary is too old for the deployment, and the fix is to re-run this step, so `latest` was
+      # self-healing and a pin would make it a manual bump.
+      #
+      # That argument is real and it is outweighed. The job below mints a token that may publish —
+      # and OVERWRITE — ANY server under io.github.coderifts/*. An unpinned, unverified binary from
+      # that download is therefore a path from "someone replaced an asset" to "someone owns the
+      # namespace". A manual bump is a chore; the other is not recoverable by re-running anything.
+      #
+      # THE COST, stated so nobody is surprised: when the registry deployment moves past v1.8.1 and
+      # login starts failing with "invalid audience", this step will NOT self-heal. Bump
+      # PUBLISHER_VERSION, re-measure CHECKSUMS_SHA256 from the new release, and commit both.
+      #
+      # ── WHERE THE HASHES COME FROM ──────────────────────────────────────────────────────────
+      #
+      # MEASURED 2026-09-13: the release publishes registry_<version>_checksums.txt, and it DOES
+      # cover the mcp-publisher assets, not only the registry ones. So the tarball's hash is taken
+      # from the project's own manifest rather than copied by hand into this file.
+      #
+      # But a manifest fetched from the same host as the tarball proves nothing on its own: whoever
+      # can serve a bad asset can serve a matching hash. So exactly ONE value is pinned here — the
+      # digest of the checksums file — and everything else is derived from it. That single line is
+      # the trust anchor, and it is small enough to review.
+      #
+      #   checksums file : registry_1.8.1_checksums.txt
+      #                    f7937a7908096f63147658e13f0f63a393a1c9fc722a2d10017593940d36e59e
+      #   verified once  : the linux_amd64 tarball it names hashes to a06c9096…, confirmed by
+      #                    downloading it on 2026-09-13.
+      #
+      # The release also ships sigstore bundles (*.sigstore.json) per asset, which would be a
+      # stronger anchor than a pinned digest. Not used yet: it needs a verifier in the job and an
+      # identity policy to check against, and a half-configured signature check that passes on
+      # anything is worse than a digest that is simply correct.
       - name: Install mcp-publisher
+        env:
+          PUBLISHER_VERSION: v1.8.1
+          CHECKSUMS_SHA256: f7937a7908096f63147658e13f0f63a393a1c9fc722a2d10017593940d36e59e
         run: |
-          curl --fail -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          set -euo pipefail
+          BASE="https://github.com/modelcontextprotocol/registry/releases/download/${PUBLISHER_VERSION}"
+          ASSET="mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz"
+          SUMS="registry_${PUBLISHER_VERSION#v}_checksums.txt"
+
+          # 1. The manifest, checked against the one value this file pins.
+          curl --fail --location --silent --show-error -o "$SUMS" "${BASE}/${SUMS}"
+          printf '%s  %s\n' "$CHECKSUMS_SHA256" "$SUMS" | sha256sum --check --status || {
+            echo "::error::${SUMS} does not match the pinned digest — refusing to read hashes out of it"
+            exit 1
+          }
+
+          # 2. The tarball, checked against the manifest we just verified.
+          curl --fail --location --silent --show-error -o "$ASSET" "${BASE}/${ASSET}"
+          LINE=$(grep " ${ASSET}\$" "$SUMS" || true)
+          [ -n "$LINE" ] || { echo "::error::${SUMS} names no ${ASSET}"; exit 1; }
+          printf '%s\n' "$LINE" | sha256sum --check --status || {
+            echo "::error::${ASSET} does not match the hash published in ${SUMS}"
+            exit 1
+          }
+
+          # 3. Only now is it allowed to become an executable. `tar xz` from a pipe, which the guide
+          #    uses, unpacks bytes nothing has looked at yet.
+          tar xzf "$ASSET" mcp-publisher
           ./mcp-publisher --version
 
       # The namespace the token will carry is io.github.<repository_owner>/*. If server.json asks
       # for anything else, the registry answers 403 — the same opaque failure this workflow exists
       # to get away from. Checking it here names the mismatch locally, before a token is minted.
       - name: Check server.json asks for this owner's namespace
+        # github.repository_owner is a trusted context and cannot carry an injection today. It is
+        # passed through env anyway: the rule that expansions do not get interpolated into a shell
+        # body is worth keeping unconditional, because the next expansion someone adds here will be
+        # copied from this line and may not be trusted.
+        env:
+          OWNER: ${{ github.repository_owner }}
         run: |
           NAME=$(jq -r '.name' server.json)
-          EXPECTED="io.github.${{ github.repository_owner }}/"
+          EXPECTED="io.github.${OWNER}/"
           echo "server.json name : $NAME"
           echo "OIDC will grant  : ${EXPECTED}*"
           case "$NAME" in

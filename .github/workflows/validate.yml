@@ -22,11 +22,24 @@ on:
     - cron: '17 6 * * *'
   workflow_dispatch:
 
+# MEASURED 2026-09-13: this file declared no permissions at all, so every job here ran with the
+# repository default — which on a repo whose default is permissive is write access to contents,
+# issues, packages and more, handed to a job that only reads files and makes one outbound fetch.
+# Naming the minimum is not paperwork: it is what stops a compromised step in a CI job from being
+# able to act as the repository.
+permissions:
+  contents: read # reads the repo and fetches the live surface; writes nothing
+
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Nothing here pushes. Keeping the token in .git/config only widens what a later step
+          # could do with it. (The action itself is still tag-pinned — see the ordering note in
+          # the hardening report; this repo's publish workflow was pinned first.)
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
