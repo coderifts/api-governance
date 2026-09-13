@@ -1,26 +1,17 @@
 {
-  "$comment": "WIRE-FORMAT tools[] exactly as GET/POST https://app.coderifts.com/mcp tools/list serves it for the DEFAULT profile. This file exists to give surface-anchor.source_ref a public, third-party-fetchable pin target: you can verify the anchor from GitHub without calling us. It is NOT the registry card - mcp.json in this repo is that, and deliberately differs (snake_case input_schema/output_schema plus an endpoint field). Do not merge the two: a catalogue consuming mcp.json depends on that shape. Validate with scripts/validate-tools-wire.mjs.",
   "schema": "coderifts.tools-wire.v1",
-  "profile": {
-    "endpoint": "https://app.coderifts.com/mcp",
-    "method": "tools/list",
-    "header_names": [],
-    "surface_params": {},
-    "id": "sha256:308ea7fa66f0aaa5"
-  },
-  "digest_input": "sha256 over the canonical JSON of tools[]: object keys sorted lexicographically at every depth (arrays keep order), no whitespace, RAW UTF-8 with no \\uXXXX escaping. Python consumers must pass ensure_ascii=False.",
-  "tools_sha256": "sha256:dc86678e81da8befd0c5c4b9ff6ab5d57bbab4f407f6800108f62b74c246abd9",
   "tool_count": 3,
+  "tools_sha256": "sha256:af868f5d3fbbb1f1be6cc8a36ca70ea13caf1f64640895ce3a2986905ed53114",
   "tools": [
     {
       "name": "preflight_change_set",
-      "description": "Use this when: a change set of contract artifacts modifies OpenAPI, GraphQL, protobuf, AsyncAPI, MCP manifests, or agent tool schemas before merge, deploy, publish, or tool registration. Do not call for documentation-only changes, static readiness scoring, or receipt verification. Use analyze for risk only; authorize requires context.operation for permission. For receipt verification use coderifts.verify_receipt instead; for details of a past decision use coderifts.get_decision_details instead.",
+      "description": "Use this when: a change set of contract artifacts modifies OpenAPI, GraphQL, protobuf, AsyncAPI, MCP manifests, or agent tool schemas before merge, deploy, publish, or tool registration. Do not call for documentation-only changes, static readiness scoring, or receipt verification. Use analyze for risk only; authorize requires context.operation for permission. For receipt verification use coderifts.verify_receipt instead; for details of a past decision use coderifts.get_decision_details instead. Inputs: preflight_mode is required: \"analyze\" (risk only; no receipt, no execution_action) or \"authorize\" (may mint a receipt; requires context.operation — merge is not deploy is not publish). Supply exactly one artifact source: artifacts[] (1–20 items, each {id, type, before, after} as the FULL spec/schema text, not a path or URL; type is openapi|graphql|grpc|asyncapi|mcp_manifest|agent_tools) XOR derivation=\"server\" (server reads GitHub Compare; needs context.repository + context.base + context.head; sending artifacts[] together is 400). Grant fields (include_execution_grant, grant_version, tenant_id, executor_id, adapter_id, target_uri, expected_state_token, state_nonce, policy_hash) apply only when preflight_mode=\"authorize\" AND include_execution_grant=true; analyze ignores them. previous_receipt is a chain token base64url(body).base64url(signature) to LINK a prior decision — it does not re-verify; call verify_receipt for that. idempotency_key replays authorize only (24h), never analyze.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "artifacts": {
             "type": "array",
-            "description": "Contract artifacts to analyze together (max 20). Each is { id, type, before, after }.",
+            "description": "1–20 contract documents analyzed together. Each item is {id, type, before, after} where before/after are the FULL document strings (YAML/JSON/proto text), not URLs or file paths. Omit this array entirely when derivation=\"server\".",
             "minItems": 1,
             "maxItems": 20,
             "items": {
@@ -39,15 +30,16 @@
                     "asyncapi",
                     "mcp_manifest",
                     "agent_tools"
-                  ]
+                  ],
+                  "description": "Artifact kind. One of openapi, graphql, grpc, asyncapi, mcp_manifest, agent_tools. Determines how before/after text is parsed. Not inferred from the filename."
                 },
                 "before": {
                   "type": "string",
-                  "description": "Prior artifact content (spec/schema/manifest) as a string"
+                  "description": "The baseline document as raw text (the spec/schema/manifest body). Empty string means \"no prior version\" (create), not \"load from disk\"."
                 },
                 "after": {
                   "type": "string",
-                  "description": "Updated artifact content as a string"
+                  "description": "The proposed document as raw text, same kind as before. Must be the bytes you intend to merge/deploy/publish, not a diff."
                 }
               },
               "required": [
@@ -60,7 +52,7 @@
           },
           "context": {
             "type": "object",
-            "description": "Optional apply-site context folded into the bundle fingerprint. operation distinguishes merge vs deploy vs publish (and other labels); the server accepts any string for operation (change-set.js) — conventional values below.",
+            "description": "Optional apply-site context folded into the bundle fingerprint. operation distinguishes merge vs deploy vs publish (and other labels); the server accepts any non-empty string; conventional values: merge, deploy, tool_call, publish. The receipt/gate must match this label.",
             "properties": {
               "operation": {
                 "type": "string",
@@ -121,15 +113,15 @@
           },
           "previous_receipt": {
             "type": "string",
-            "description": "Optional prior chain receipt token to link"
+            "description": "Optional prior chain token to LINK this call into a receipt chain: base64url(body).base64url(signature). Linking is not verification — a linked token is not re-checked here; use verify_receipt."
           },
           "include_execution_grant": {
             "type": "boolean",
-            "description": "Opt-in (authorize only). When true on allow-class authorize, the response includes a signed execution_grant (cr.exec.v1) alongside chain_receipt, or HTTP 503 SIGNER_UNAVAILABLE — never unsigned. Default false. Analyze ignores this flag. See docs/cr-exec-v1.md."
+            "description": "Authorize only. When true on an allow-class authorize, the response includes a signed execution_grant, or HTTP 503 SIGNER_UNAVAILABLE — never an unsigned grant. Default false. Analyze ignores this flag. Ignored unless preflight_mode=\"authorize\"."
           },
           "state_nonce": {
             "type": "string",
-            "description": "Optional ATOMIC-profile nonce. When include_execution_grant is true, copied into the signed grant as state_nonce (a separate signed field — NOT folded into scope_hash). Absent → BEARER grant (today's default). See docs/cr-exec-v1.md."
+            "description": "Authorize+grant only. Opaque nonce copied into the signed grant as its own field (not folded into scope_hash). Absent → BEARER grant. Ignored unless include_execution_grant is true."
           },
           "grant_version": {
             "type": "string",
@@ -143,23 +135,23 @@
           },
           "tenant_id": {
             "type": "string",
-            "description": "Tenant the grant is issued under (cr.exec.v2). Defaults to \"default\" when absent."
+            "description": "Authorize+grant v2 only. Tenant the grant is issued under. ASCII slug. When omitted the server uses \"default\" — pin it if you are not on the default tenant."
           },
           "executor_id": {
             "type": "string",
-            "description": "Identity of the executor the grant is bound to (cr.exec.v2)."
+            "description": "Authorize+grant v2 only. Executor identity the grant is bound to (example: agent:ci-bot, host:github-actions). Empty/absent is not \"any executor\"."
           },
           "adapter_id": {
             "type": "string",
-            "description": "Adapter the executor will apply the change with, e.g. fs, postgres, git (cr.exec.v2)."
+            "description": "Authorize+grant v2 only. Adapter that will apply the change. Conventional values: fs, postgres, git. Must match the adapter the executor actually uses; a git grant does not authorize an fs write."
           },
           "target_uri": {
             "type": "string",
-            "description": "Target the grant is bound to (cr.exec.v2). Falls back to context.target_uri, then to a repository/head-derived value."
+            "description": "Authorize+grant v2 only. URI the grant binds (example: git://owner/repo.git/refs/heads/main). Fallback if omitted: context.target_uri, then repository/head-derived. Distinct from context.target_id."
           },
           "expected_state_token": {
             "type": "string",
-            "description": "State token the executor expects to observe at apply time (cr.exec.v2). Signed as a separate field; empty string when absent."
+            "description": "Authorize+grant v2 only. Compare-and-swap token the executor must observe at apply time (the \"before\" state). Signed as its own field. Omit only if the adapter has no prior state; do not send a placeholder."
           },
           "audience": {
             "type": "string",
@@ -167,7 +159,7 @@
           },
           "policy_hash": {
             "type": "string",
-            "description": "Policy identity the grant is issued under (cr.exec.v2). Bound into the signed grant when supplied."
+            "description": "Authorize+grant v2 only. Policy identity bound into the grant, sha256: + 64 hex. When supplied, apply must use that same policy; a different policy is a different grant."
           },
           "idempotency_key": {
             "type": "string",
@@ -194,7 +186,7 @@
             "enum": [
               "server"
             ],
-            "description": "Opt-in (ID637 6b). \"server\" = the server derives artifacts[] from GitHub Compare via the App installation. Allowed only when the tenant has a proven binding for context.repository and context.base + context.head are present. Omit artifacts[] (caller-supplied artifacts[] with this flag is 400 — one source of truth). Default absent = today's caller-artifacts path (byte-identical)."
+            "description": "\"server\" = the server derives artifacts[] from GitHub Compare via the App installation. Allowed only when context.repository, context.base and context.head are all present and the tenant has a proven binding for that repository. Do not send artifacts[] in the same call (400 — one source of truth). Omit this field for the caller-supplied artifacts[] path."
           }
         },
         "required": [
@@ -1089,14 +1081,14 @@
                       "object",
                       "null"
                     ],
-                    "description": "ID963 additive. { audience, tenant_scope: bound|unbound, binding_proven_at? }. Informational — not permission, not a verify-receipt gate, not an ACL."
+                    "description": "Additive. { audience, tenant_scope: bound|unbound, binding_proven_at? }. Informational — not permission, not a verify-receipt gate, not an ACL."
                   },
                   "derivation": {
                     "type": [
                       "object",
                       "null"
                     ],
-                    "description": "ID637 6b additive. Present only when derivation:\"server\" produced this envelope. { source, platform?, base_sha, head_sha }. Covered by body_hash; not fingerprint."
+                    "description": "Additive. Present only when derivation:\"server\" produced this envelope. { source, platform?, base_sha, head_sha }. Covered by body_hash; not fingerprint."
                   },
                   "receipt": {
                     "type": "object"
@@ -1428,14 +1420,14 @@
                   "object",
                   "null"
                 ],
-                "description": "ID963 additive. { audience, tenant_scope: bound|unbound, binding_proven_at? }. Informational — not permission, not a verify-receipt gate, not an ACL."
+                "description": "Additive. { audience, tenant_scope: bound|unbound, binding_proven_at? }. Informational — not permission, not a verify-receipt gate, not an ACL."
               },
               "derivation": {
                 "type": [
                   "object",
                   "null"
                 ],
-                "description": "ID637 6b additive. Present only when derivation:\"server\" produced this envelope. { source, platform?, base_sha, head_sha }. Covered by body_hash; not fingerprint."
+                "description": "Additive. Present only when derivation:\"server\" produced this envelope. { source, platform?, base_sha, head_sha }. Covered by body_hash; not fingerprint."
               },
               "receipt": {
                 "type": "object"
@@ -1792,14 +1784,14 @@
                   "object",
                   "null"
                 ],
-                "description": "ID963 additive. { audience, tenant_scope: bound|unbound, binding_proven_at? }. Informational — not permission, not a verify-receipt gate, not an ACL."
+                "description": "Additive. { audience, tenant_scope: bound|unbound, binding_proven_at? }. Informational — not permission, not a verify-receipt gate, not an ACL."
               },
               "derivation": {
                 "type": [
                   "object",
                   "null"
                 ],
-                "description": "ID637 6b additive. Present only when derivation:\"server\" produced this envelope. { source, platform?, base_sha, head_sha }. Covered by body_hash; not fingerprint."
+                "description": "Additive. Present only when derivation:\"server\" produced this envelope. { source, platform?, base_sha, head_sha }. Covered by body_hash; not fingerprint."
               },
               "receipt": {
                 "type": "object"
