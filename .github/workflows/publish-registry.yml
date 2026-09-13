@@ -51,21 +51,30 @@ jobs:
   publish:
     runs-on: ubuntu-latest
 
-    # ── THE environment: KEY GOES HERE, AND ONLY AFTER THE ENVIRONMENT EXISTS ────────────────
+    # The environment exists now, so the key is here rather than in a comment. It was withheld
+    # until it did: declaring one GitHub has never heard of makes it AUTO-CREATE it with no
+    # protection rules, which reads as a control while being none.
     #
-    #   environment: mcp-registry-publish
+    # MEASURED 2026-09-13 via `gh api repos/coderifts/api-governance/environments`:
+    #   branch_policy      -> custom, one entry: main
+    #   required_reviewers -> zsobpeter-code
     #
-    # Do NOT paste that line in first. Per the registry's own guide, declaring an environment that
-    # does not exist yet makes GitHub AUTO-CREATE it with NO protection rules — it would read as a
-    # control while being none, which is worse than the honest absence below.
+    # It is a job-level key and there is no workflow-level equivalent — the published workflow
+    # schema allows environment only under a job, and refuses unknown keys at the top.
     #
-    # Create it first: Settings -> Environments -> New environment -> mcp-registry-publish, add a
-    # Required reviewer, and restrict its deployment branches to the default branch. Then add the
-    # key above, and every publish pauses for a named human.
+    # ⚠ WHAT THIS GATE IS, AND IS NOT. prevent_self_review is FALSE, which on a one-person project
+    # is not a lapse but the only reachable configuration: the reviewer and the person who pressed
+    # Run workflow are the same. So this is NOT four eyes and nothing here should be read as
+    # review. What it is: the run does not start on its own. It halts, names the environment, and
+    # waits for a deliberate second action — which is what turns an accidental dispatch, or a
+    # dispatch by someone who did not realise what this workflow can overwrite, into a pause with
+    # a name on it. When a second maintainer exists, turn prevent_self_review on and this comment
+    # becomes wrong in the right direction.
     #
-    # UNTIL THEN, the blast radius is stated rather than implied: this job can mint a token that
-    # publishes to — and overwrites — anything under io.github.coderifts/*, and workflow_dispatch
-    # needs only write access. So today that is "everyone who can push to this repo".
+    # The blast radius it bounds: this job mints a token that may publish to — and overwrite —
+    # anything under io.github.coderifts/*, and workflow_dispatch needs only write access.
+    environment: mcp-registry-publish
+
     permissions:
       # The one that matters. Without it the OIDC token is never minted and `login github-oidc`
       # fails with "Authentication failed" — the registry guide's first troubleshooting row.
