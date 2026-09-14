@@ -1,11 +1,14 @@
-# CodeRifts — API Governance
+# CodeRifts — contract-change authorization
 
-**Risk-aware API compatibility governance for AI agents and CI.** Before a change merges, CodeRifts predicts whether it will cause a real production problem, who breaks, by what pattern, at what business cost, and whether blocking is justified.
+**Only a granted change can proceed.** Before a contract change merges, deploys or registers, CodeRifts decides whether it is authorized — and the check is red without a grant.
 
-The market shows you *what* changed. CodeRifts tells you *how dangerous it is, who it affects, when deployment should be blocked, and how much it will cost.*
+One grant binds three things: the authorization, its single use, and the target state the change moves to. The decision is signed, and the receipt verifies offline — you do not have to trust our database to check what was authorized.
+
+Every decision also names what it does not prove.
 
 - Hosted MCP server: `https://app.coderifts.com/mcp`
-- Manifest: `https://coderifts.com/mcp.json`
+- Manifest: `https://coderifts.com/mcp.json` — the canonical published document. The `mcp.json`
+  at the root of this repository is a pointer to it, not a second copy.
 - Official MCP Registry: `io.github.coderifts/api-governance`
 - Website: `https://coderifts.com`
 - Live demo PR: `https://github.com/coderifts/demo/pull/4`
@@ -227,7 +230,9 @@ Both return `200` with a `decision` field.
 
 ## Tools
 
-The hosted MCP server exposes **exactly three** tools (from live `tools/list` / generated `mcp.json`):
+The hosted MCP server exposes **exactly three** tools (from live `tools/list`; pinned in this
+repository as [`tools.wire.v1.json`](./tools.wire.v1.json), which `npm run validate:tools-wire`
+checks against the live server on every push, pull request and the daily cron):
 
 | Tool | What it does |
 |------|--------------|
