@@ -111,15 +111,25 @@ if (mustExist(mcpPath, '.mcp.json exists')) {
   }
 }
 
-// ── 3. Tool parity vs generated mcp.json ─────────────────────────────────────
-const registryMcp = path.join(ROOT, 'mcp.json');
-if (mustExist(registryMcp, 'repo mcp.json exists')) {
-  const reg = readJson(registryMcp);
+// ── 3. Tool parity vs the wire pin ───────────────────────────────────────────
+// The anchor is tools.wire.v1.json, NOT mcp.json. Both carry the three names, but only
+// tools.wire.v1.json is held to the live server: validate-tools-wire.mjs fetches tools/list
+// over the network on every push, PR and the daily cron, and fails if a byte moved. mcp.json
+// was a mirror nothing checked, so a parity check anchored on it compared one unverified copy
+// against another. Anchor parity on the file that has to be true.
+const wirePin = path.join(ROOT, 'tools.wire.v1.json');
+if (mustExist(wirePin, 'repo tools.wire.v1.json exists')) {
+  const reg = readJson(wirePin);
   const regNames = (reg.tools || []).map((t) => t.name);
   if (JSON.stringify(regNames) !== JSON.stringify(CANONICAL_TOOLS)) {
-    fail('mcp.json tool set', JSON.stringify(regNames));
+    fail(
+      'tools.wire.v1.json tool set',
+      `${JSON.stringify(regNames)} — this file is pinned byte-for-byte to the live tools/list `
+        + '(validate-tools-wire.mjs, network, daily cron). If it disagrees with CANONICAL_TOOLS, '
+        + 'either the live surface changed or the pin is stale; run validate:tools-wire first.',
+    );
   } else {
-    ok('mcp.json has exactly 3 canonical tools', regNames.join(', '));
+    ok('tools.wire.v1.json has exactly 3 canonical tools (pinned to live)', regNames.join(', '));
   }
 
   const skillPath = path.join(PKG, 'skills', 'api-governance', 'SKILL.md');
@@ -267,5 +277,5 @@ if (failed) {
   console.log(`RESULT: FAIL (${failed} check(s)) ${rec.modeBanner(openaiLive ? 'LIVE' : 'RECORDED')}`);
   process.exit(1);
 }
-console.log(`RESULT: ALL PASS ${rec.modeBanner(openaiLive ? 'LIVE' : 'RECORDED')}`);
+console.log(`RESULT: ${openaiLive ? 'ALL PASS' : 'PARITY OK'} ${rec.modeBanner(openaiLive ? 'LIVE' : 'RECORDED')}`);
 process.exit(0);
