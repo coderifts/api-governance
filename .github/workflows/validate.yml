@@ -55,3 +55,10 @@ jobs:
       # Network: fetches the live tools/list and compares. This is the source_ref obligation.
       - name: Validate wire-format pin target against the live surface
         run: npm run validate:tools-wire
+
+      # The RECORDED fallback below cannot see a snapshot that fell behind its source — the app
+      # checkout is private, so CI never runs LIVE. This gate covers exactly that blind spot,
+      # against a public anchor (the rule text published in @coderifts/sdk). Removing it turns the
+      # kit validators' RECORDED pass back into the silent green it was before 2026-09-14.
+      - name: Validate recorded rule text against the published policy
+        run: npm run validate:rule-provenance

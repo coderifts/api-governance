@@ -374,5 +374,5 @@ if (failed) {
   console.log(`RESULT: FAIL (${failed} check(s)) ${rec.modeBanner(LIVE ? 'LIVE' : 'RECORDED')}`);
   process.exit(1);
 }
-console.log(`RESULT: ALL PASS ${rec.modeBanner(LIVE ? 'LIVE' : 'RECORDED')}`);
+console.log(`RESULT: ${LIVE ? 'ALL PASS' : 'PARITY OK'} ${rec.modeBanner(LIVE ? 'LIVE' : 'RECORDED')}`);
 process.exit(0);

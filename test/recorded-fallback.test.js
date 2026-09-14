@@ -34,25 +34,31 @@ function cleanRoomEnv() {
 }
 
 describe('1374 — clean-room RECORDED (no coderifts-app)', () => {
-  it('validate-copilot-kit exits 0 and prints [RECORDED — weaker than LIVE]', () => {
+  it('validate-copilot-kit exits 0 and prints a RECORDED banner that names its blind spot and the gate covering it', () => {
     const { env } = cleanRoomEnv();
     const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'validate-copilot-kit.js')], {
       encoding: 'utf8',
       env,
     });
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.match(r.stdout, /\[RECORDED — weaker than LIVE\]/);
+    assert.match(r.stdout, /\[RECORDED — kit matches the recording; generator output not re-derived\./);
+    // The banner must keep naming the gate that covers its blind spot. If that name is dropped,
+    // a RECORDED pass silently widens back into the claim it was before 2026-09-14.
+    assert.match(r.stdout, /held to the published rule by validate:rule-provenance/);
     assert.equal(/\[LIVE\]/.test(r.stdout), false);
   });
 
-  it('validate-cursor-plugin exits 0 and prints [RECORDED — weaker than LIVE]', () => {
+  it('validate-cursor-plugin exits 0 and prints a RECORDED banner that names its blind spot and the gate covering it', () => {
     const { env } = cleanRoomEnv();
     const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'validate-cursor-plugin.js')], {
       encoding: 'utf8',
       env,
     });
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.match(r.stdout, /\[RECORDED — weaker than LIVE\]/);
+    assert.match(r.stdout, /\[RECORDED — kit matches the recording; generator output not re-derived\./);
+    // The banner must keep naming the gate that covers its blind spot. If that name is dropped,
+    // a RECORDED pass silently widens back into the claim it was before 2026-09-14.
+    assert.match(r.stdout, /held to the published rule by validate:rule-provenance/);
     assert.equal(/rule generated drift skipped/.test(r.stdout), false);
   });
 
@@ -73,7 +79,8 @@ describe('1374 — clean-room RECORDED (no coderifts-app)', () => {
       { encoding: 'utf8', env, cwd: ROOT },
     );
     assert.equal(chain.status, 0, chain.stdout + chain.stderr);
-    assert.match(chain.stdout, /\[RECORDED — weaker than LIVE\]/);
+    assert.match(chain.stdout, /\[RECORDED — kit matches the recording; generator output not re-derived\./);
+    assert.match(chain.stdout, /held to the published rule by validate:rule-provenance/);
   });
 });
 
