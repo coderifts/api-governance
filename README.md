@@ -86,7 +86,7 @@ as the Claude plugin — no fourth tool.
 | `plugins/api-governance-openai/skills/api-governance/SKILL.md` | Skill + tool list | Trigger wording from agent-setup rule; tool names/descriptions from generated `mcp.json` |
 | `plugins/api-governance-openai/AGENTS.md` | Agent rules file | **Generated** — `coderifts agent-setup` / `generate-agent-host-files.js` |
 | `plugins/api-governance-openai/openai-agent-instructions.md` | OpenAI Agents SDK instructions | **Generated** — same generator |
-| `plugins/api-governance-openai/docs/openai-production-pattern.md` | **Production pattern (ID108)** — host dispatch loop with `executeOpenAIToolCall` | Hand-authored recipe on shipped `@coderifts/agent-guard` ≥ 6.4.0 |
+| `plugins/api-governance-openai/docs/openai-production-pattern.md` | **Production pattern (ID108)** — host dispatch loop with `executeOpenAIToolCall` | Hand-authored recipe on shipped `@coderifts/agent-guard` ≥ 6.4.0 (first npm release that exports `executeOpenAIToolCall`; current npm 17.3.3) |
 | `plugins/api-governance-openai/scripts/smoke-execute-openai-tool-call.mjs` | Offline smoke (ALLOW + BLOCK; no OpenAI key) | Real dispatcher + stub client |
 | `.agents/plugins/marketplace.json` | Codex marketplace entry | Codex marketplace schema |
 
@@ -101,6 +101,8 @@ that host loop — not as a Claude-style PreToolUse hook. Full steps + one canon
 # Offline smoke (needs ~/coderifts-agent-guard built, or CODERIFTS_AGENT_GUARD_ROOT)
 npm run smoke:openai-dispatch
 ```
+
+As of 2026-09-14 this command **fails on one assertion** (`ALLOW factory ran — execute() did not run`; the remaining ALLOW and BLOCK assertions pass). Investigation is in progress.
 
 Local checkout in Codex (team marketplace path):
 
@@ -183,7 +185,7 @@ CodeRifts runs as a hosted **Streamable HTTP** MCP server. Any MCP-compatible ag
 
 - **Endpoint:** `https://app.coderifts.com/mcp`
 - **Transport:** Streamable HTTP (protocol version `2025-06-18`)
-- **Server:** `CodeRifts API Governance` `v1.0.0`
+- **Server:** `CodeRifts API Governance` `v1.0.2`
 - **Auth:** `initialize` and `tools/list` are open (no key); `tools/call` requires an API key - send `Authorization: Bearer <key>` or `X-API-Key: <key>`.
 
 ### Connect
@@ -224,7 +226,10 @@ curl -s -X POST https://app.coderifts.com/api/v1/public/actionguard-check \
   -d '{"filename":".github/workflows/ci.yml","base_content":null,"head_content":"jobs:\n  b:\n    steps:\n      - uses: some-owner/some-action@main"}'
 ```
 
-Both return `200` with a `decision` field.
+Both return HTTP `200` without a key. They do not share a response shape:
+
+- `GET /api/v1/public/preflight` is analyze-only. There is no `decision` field. The body carries `analysis_outcome` (Petstore URL: `NO_BREAK_DETECTED`), `authorization_effect: NONE`, and `may_execute: false`.
+- `POST /api/v1/public/actionguard-check` does return a `decision` field (unpinned `uses: @main` payload: `WARN`) plus `execution_action: CONTINUE_WITH_MONITORING`.
 
 ---
 
