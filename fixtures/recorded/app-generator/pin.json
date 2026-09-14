@@ -3,7 +3,7 @@
   "producer": {
     "name": "coderifts-app",
     "repo": "https://github.com/coderifts/app",
-    "commit": "c97f13ca8b0b26df9c89f59d9e520529c4e07cc6",
+    "commit": "12264a24016d0b4c48000c63c33835739bc823b3",
     "generated_last_touched": "6a44047",
     "generator": [
       "scripts/generate-copilot-mcp.js",
@@ -51,15 +51,15 @@
     {
       "path": "copilot/.github/copilot-instructions.md",
       "role": "copilot-instructions",
-      "sha256": "63e83e379e961c19ded76911a685c79ddb7e2112b3417b1624576e0987a3cfbf",
-      "bytes": 4781,
+      "sha256": "57f7784e2c7a43b906bd6809964a3ba9aec62515bc52acceae58c1cf0bce5b2d",
+      "bytes": 5049,
       "app_path": "generated/agent-host/.github/copilot-instructions.md"
     },
     {
       "path": "openai/AGENTS.md",
       "role": "openai-agents",
-      "sha256": "d589766a768bb9994484651d09bb5af6e7765ab155c98f56d11e571b3c998b8d",
-      "bytes": 4761,
+      "sha256": "e405c05a1bdfb9f9ec91db37d4e406aed3487460d3ce4591a70267519b613f1a",
+      "bytes": 5029,
       "app_path": "generated/agent-host/AGENTS.md"
     },
     {
