@@ -1,7 +1,7 @@
 {
   "$comment": "This copy was a mirror of the published manifest and is no longer maintained. The canonical document is the one below: it is generated from the live tool surface and guarded against drift. Kept at this path so that anything still pointing here is told where to look, rather than receiving a 404.",
   "canonical": "https://coderifts.com/mcp.json",
-  "tools_sha256": "sha256:4c3d2bcc7c1c00fe7cd9ee5e6df6ada47652bf9b3537a1a9d82815142afa5b38",
+  "tools_sha256": "sha256:497eb029b30cb79872ed8f93bc9b239d615e2eff9479e0db294a6228e6c5d700",
   "tools_sha256_note": "The digest of the tool surface the canonical document describes, as served at the time of the move. tools.wire.v1.json in this repository carries the same digest and is checked against the live server on every run — so this pointer can be verified, not just followed.",
   "moved": "2026-09-14"
 }

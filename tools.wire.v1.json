@@ -1,7 +1,7 @@
 {
   "schema": "coderifts.tools-wire.v1",
   "tool_count": 3,
-  "tools_sha256": "sha256:4c3d2bcc7c1c00fe7cd9ee5e6df6ada47652bf9b3537a1a9d82815142afa5b38",
+  "tools_sha256": "sha256:497eb029b30cb79872ed8f93bc9b239d615e2eff9479e0db294a6228e6c5d700",
   "tools": [
     {
       "name": "preflight_change_set",
@@ -129,7 +129,7 @@
               "v1",
               "v2"
             ],
-            "x-coderifts-effective-default": "v1",
+            "x-coderifts-effective-default": "v2",
             "x-coderifts-default-changes-at": "2026-09-18",
             "description": "Grant envelope to mint when include_execution_grant is true. Omitting this yields cr.exec.v1 until 2026-09-18 and cr.exec.v2 on and after it (see x-coderifts-effective-default / x-coderifts-default-changes-at). The response meta.grant_version is the version actually issued. An explicit value always wins — pin \"v1\" to keep current behaviour with no code change on the date."
           },
@@ -171,15 +171,14 @@
               "analyze",
               "authorize"
             ],
-            "description": "REQUIRED. \"analyze\" = informational risk only (no decision/execution_action/safe_for_agent; analysis_outcome + may_execute:false). \"authorize\" = operation-bound path; may mint a receipt (requires context.operation). Decision Spec 2.0: omission is an error unless decision_spec_version is '1.0' (30-day legacy pin with soft-default analyze)."
+            "description": "REQUIRED. \"analyze\" = informational risk only (no decision/execution_action/safe_for_agent; analysis_outcome + may_execute:false). \"authorize\" = operation-bound path; may mint a receipt (requires context.operation). Decision Spec 2.0: omission is INVALID_INPUT. Do not pin 1.0 — that pin retired."
           },
           "decision_spec_version": {
             "type": "string",
             "enum": [
-              "1.0",
               "2.0"
             ],
-            "description": "Optional pin. '1.0' = legacy contract (soft-default mode + analyze still carries decision/execution_action) until the sunset date. Omit or '2.0' = current contract."
+            "description": "Optional. Omit or '2.0' = current contract. '1.0' retired (INVALID_INPUT); do not pin 1.0."
           },
           "derivation": {
             "type": "string",
