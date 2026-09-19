@@ -1,7 +1,7 @@
 {
   "name": "api-governance-openai",
   "version": "1.0.0",
-  "description": "CodeRifts API governance for Codex/OpenAI — preflight contract change sets, verify signed receipts, and look up past decisions before merge or ship.",
+  "description": "Signed, offline-verifiable authorization for AI-agent contract changes. Codex asks before a contract change proceeds; only a granted change can proceed.",
   "author": {
     "name": "CodeRifts",
     "email": "peter@coderifts.com",
@@ -24,9 +24,9 @@
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
-    "displayName": "CodeRifts API Governance",
-    "shortDescription": "Preflight API/tool-contract changes before merge or ship",
-    "longDescription": "CodeRifts API governance for agents: call preflight_change_set before merge, deploy, publish, or tool registration when a contract artifact changed; branch on execution_action only; use verify_receipt for a receipt you already hold and get_decision_details for a past decision. Hosted Streamable HTTP MCP at https://app.coderifts.com/mcp exposes exactly those three tools.",
+    "displayName": "CodeRifts",
+    "shortDescription": "Only a granted contract change can proceed",
+    "longDescription": "Signed, offline-verifiable authorization for AI-agent contract changes. Call preflight_change_set before merge, deploy, publish, or tool registration when a contract artifact changed; branch on execution_action only; use verify_receipt for a receipt you already hold and get_decision_details for a past decision. Hosted Streamable HTTP MCP at https://app.coderifts.com/mcp exposes exactly those three tools. Only a granted change can proceed.",
     "developerName": "CodeRifts",
     "category": "Developer Tools",
     "capabilities": [

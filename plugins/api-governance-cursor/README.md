@@ -1,6 +1,6 @@
-# CodeRifts API Governance — Cursor plugin
+# CodeRifts — Cursor plugin
 
-Deterministic, signed, fail-closed API-contract governance for Cursor. This is **not** an AI compatibility scan: the hosted MCP returns a closed `execution_action` set and may mint an Ed25519 chain-receipt. Unrecognised actions fail closed.
+Signed, offline-verifiable authorization for AI-agent contract changes. Cursor asks before a contract change proceeds; only a granted change can proceed. The hosted MCP returns a closed `execution_action` set and may mint a signed receipt. Unrecognised actions fail closed.
 
 Exactly three tools: `preflight_change_set`, `verify_receipt`, `get_decision_details`.
 

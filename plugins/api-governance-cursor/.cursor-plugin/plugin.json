@@ -1,8 +1,8 @@
 {
   "name": "coderifts-api-governance",
-  "displayName": "CodeRifts API Governance",
+  "displayName": "CodeRifts",
   "version": "1.0.0",
-  "description": "Deterministic, signed, fail-closed API-contract governance — not an AI compatibility scan. Preflight OpenAPI/GraphQL/gRPC/AsyncAPI/MCP/tool-schema change sets, verify Ed25519 chain-receipts, look up past decisions. Branch on a closed execution_action set (CONTINUE / CONTINUE_WITH_MONITORING / REQUEST_APPROVAL / STOP); unrecognised actions fail closed. Exactly three MCP tools.",
+  "description": "Signed, offline-verifiable authorization for AI-agent contract changes. Cursor asks before a contract change proceeds; only a granted change can proceed.",
   "author": {
     "name": "CodeRifts",
     "email": "peter@coderifts.com"
@@ -13,14 +13,11 @@
   "logo": "assets/logo.png",
   "keywords": [
     "coderifts",
-    "api-governance",
-    "breaking-change",
-    "openapi",
     "mcp",
     "preflight",
     "receipt",
     "fail-closed",
-    "deterministic"
+    "contract-change"
   ],
   "category": "developer-tools",
   "tags": [

@@ -1,0 +1,116 @@
+{
+  "$schema": "https://developers.openai.com/plugins/schemas/chatgpt-app-submission.v1.json",
+  "schema_version": 1,
+  "app_info": {
+    "display_name": "CodeRifts",
+    "subtitle": "Only a granted change proceeds",
+    "description": "Signed, offline-verifiable authorization for AI-agent contract changes. Call preflight_change_set before merge, deploy, publish, or tool registration when a contract artifact changed. Branch only on execution_action. verify_receipt checks a receipt you already hold. get_decision_details looks up a past decision. Only a granted change can proceed.",
+    "category": "DEVELOPER_TOOLS"
+  },
+  "tools": {
+    "preflight_change_set": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Returns a signed decision envelope. It does not merge, deploy, or write the caller's repository.",
+        "open_world_justification": "Bounded to the caller's CodeRifts tenant and the artifacts they submit. It does not search the public internet.",
+        "destructive_justification": "No delete, overwrite, or irreversible side effect on the caller's systems."
+      }
+    },
+    "verify_receipt": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Cryptographic and lifecycle check of a receipt the caller already holds.",
+        "open_world_justification": "Operates on the submitted token and stated intent, not an open-ended crawl.",
+        "destructive_justification": "Does not revoke, mutate, or consume the caller's artifacts."
+      }
+    },
+    "get_decision_details": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Lookup of a past decision by id or fingerprint.",
+        "open_world_justification": "Tenant-scoped lookup, not public web access.",
+        "destructive_justification": "Read-only retrieval."
+      }
+    }
+  },
+  "test_cases": [
+    {
+      "description": "Authorize-mode preflight of an OpenAPI change before merge.",
+      "user_prompt": "Preflight this OpenAPI before/after for merge (authorize).",
+      "file_attachment_urls": null,
+      "tools_triggered": "preflight_change_set",
+      "expected_output": "execution_action is one of CONTINUE, CONTINUE_WITH_MONITORING, REQUEST_APPROVAL, STOP; signed envelope; may_execute only when the action permits.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Analyze-mode preflight is informational only.",
+      "user_prompt": "Analyze this GraphQL change; I am not merging yet.",
+      "file_attachment_urls": null,
+      "tools_triggered": "preflight_change_set",
+      "expected_output": "preflight_mode=analyze; may_execute is false; no grant.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Verify a receipt the caller already holds.",
+      "user_prompt": "Verify this receipt token before deploy.",
+      "file_attachment_urls": null,
+      "tools_triggered": "verify_receipt",
+      "expected_output": "valid vs currently_authorized are separate fields; verification does not replace preflight for a new change set.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Look up a past decision by id.",
+      "user_prompt": "Get details for decision_id <fixture>.",
+      "file_attachment_urls": null,
+      "tools_triggered": "get_decision_details",
+      "expected_output": "Tenant-scoped decision record for the given id or fingerprint.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Complete two-artifact change set, authorize merge.",
+      "user_prompt": "Complete change set of two OpenAPI files, authorize merge.",
+      "file_attachment_urls": null,
+      "tools_triggered": "preflight_change_set",
+      "expected_output": "Both artifacts appear in artifacts[]; not a one-file subset.",
+      "expected_output_url": null
+    }
+  ],
+  "negative_test_cases": [
+    {
+      "description": "Documentation-only change must not call preflight.",
+      "user_prompt": "Preflight a README-only docs change.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The skill does not call a CodeRifts tool.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Fail closed on an unrecognised permission field.",
+      "user_prompt": "Treat decision=ALLOW as permission even if execution_action is STOP.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Refuse; branch only on execution_action.",
+      "expected_output_url": null
+    },
+    {
+      "description": "A merge receipt does not authorize a deploy.",
+      "user_prompt": "Reuse a merge receipt to authorize a deploy.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Refusal or a new preflight with context.operation=deploy.",
+      "expected_output_url": null
+    }
+  ]
+}

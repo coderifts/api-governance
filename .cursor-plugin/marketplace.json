@@ -5,13 +5,13 @@
     "email": "peter@coderifts.com"
   },
   "metadata": {
-    "description": "CodeRifts API governance plugins for Cursor — deterministic signed fail-closed contract preflight, not an AI compatibility scan."
+    "description": "Signed, offline-verifiable authorization for AI-agent contract changes. Only a granted change can proceed."
   },
   "plugins": [
     {
       "name": "coderifts-api-governance",
       "source": "plugins/api-governance-cursor",
-      "description": "Deterministic, signed, fail-closed API-contract governance — preflight change sets, verify Ed25519 receipts, look up past decisions. Exactly three MCP tools."
+      "description": "Signed, offline-verifiable authorization for AI-agent contract changes. Cursor asks before a contract change proceeds; only a granted change can proceed."
     }
   ]
 }
