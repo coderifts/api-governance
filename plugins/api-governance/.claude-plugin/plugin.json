@@ -1,7 +1,7 @@
 {
   "name": "api-governance",
   "version": "1.0.0",
-  "description": "CodeRifts API governance for agents — preflight contract change sets, verify signed receipts, and look up past decisions before merge or ship.",
+  "description": "Signed, offline-verifiable authorization for AI-agent contract changes. Claude Code asks before a contract change proceeds; only a granted change can proceed.",
   "author": {
     "name": "CodeRifts",
     "email": "peter@coderifts.com"
