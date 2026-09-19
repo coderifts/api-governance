@@ -1,6 +1,6 @@
 ---
 name: api-governance
-description: Before merging or shipping any API or tool-contract change: preflight the change set, then branch on execution_action.
+description: "Before merging or shipping any API or tool-contract change: preflight the change set, then branch on execution_action."
 ---
 
 # CodeRifts API Governance
