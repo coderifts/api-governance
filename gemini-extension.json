@@ -1,0 +1,19 @@
+{
+  "name": "coderifts",
+  "version": "1.0.0",
+  "description": "Signed, offline-verifiable authorization for AI-agent contract changes. Gemini CLI loads the hosted MCP; only a granted change can proceed.",
+  "mcpServers": {
+    "coderifts": {
+      "httpUrl": "https://app.coderifts.com/mcp",
+      "timeout": 30000
+    }
+  },
+  "settings": [
+    {
+      "name": "CodeRifts API key",
+      "description": "API key from https://coderifts.com. Discovery (initialize, tools/list) works without it; running a tool needs it.",
+      "envVar": "CODERIFTS_API_KEY",
+      "sensitive": true
+    }
+  ]
+}
