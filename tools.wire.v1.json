@@ -1,7 +1,7 @@
 {
   "schema": "coderifts.tools-wire.v1",
   "tool_count": 3,
-  "tools_sha256": "sha256:b5db8b9598e3253e19d453d58ede479e2ba7623a6c0c0fd34a9ec2555fa69112",
+  "tools_sha256": "sha256:7d6fe4a0d5ef31a4cec82aaa0762c4434a246899233ff13321fe08b5cf8475d2",
   "tools": [
     {
       "name": "preflight_change_set",
@@ -1579,22 +1579,29 @@
     },
     {
       "name": "get_decision_details",
-      "description": "Retrieve a PAST CodeRifts decision by decision_id (or fingerprint): full\nreport payload, breaking changes list, scores, and linked receipt metadata\nif stored.\n\nUse this when:\n- You have a decision_id (or fingerprint) from a previous preflight, PR\n  comment, or CI log and need to inspect or explain that past decision.\n- You are auditing why a prior ALLOW/WARN/BLOCK was issued.\n- You are NOT requesting a new analysis of current before/after specs.\n\nDo not use when:\n- You need a decision for the CURRENT uncommitted or PR head change set —\n  call coderifts.preflight_change_set with the current artifacts.\n- You hold a receipt token and only need cryptographic/lifecycle verification —\n  use coderifts.verify_receipt.\n- You have no decision_id/fingerprint — run preflight first to create one.\n\nInputs: at least one of decision_id (preferred) or fingerprint is required\n(empty {} is rejected by the server as INVALID_INPUT). Returns the stored\ndecision document or not_found.\n\nScoping — fingerprint lookup returns only YOUR OWN decisions. A fingerprint is\nderived from content, not from an account, so two callers who preflight\nbyte-identical specs derive the same one; the lookup is therefore constrained\nto the decisions your credential can prove it owns.\n\nA decision that exists but is not yours returns the SAME not_found as one that\nwas never issued. This is deliberate: a distinguishable \"exists but forbidden\"\nwould confirm to any caller that a given content hash had been decided on by\nsomeone, which is the fact the scoping exists to withhold. Do not read\nnot_found as proof that no such decision exists anywhere.\n\nDecisions persisted without context.repository cannot currently be attributed\nto an account, and are not retrievable by fingerprint at all — not by their\nowner either. Retrieve those by decision_id, which is unchanged and unscoped.\nThis is a limitation of what older stored rows carry, not a property of the\nlookup: rows written from now on record the account directly, so the gap\nnarrows as older rows age out. If a fingerprint you expect returns not_found,\nuse the decision_id before concluding the decision is missing.\n\nWhen the stored envelope carries control fields, control_envelope.next_agent_step\nis structured remediation guidance the agent MAY follow for non-CONTINUE\nexecution_action values (null on CONTINUE*). Still branch on execution_action;\nnext_agent_step is a suggestion, not permission.",
+      "description": "Retrieve a PAST CodeRifts decision by exactly one identifier\n(case_id | decision_id | fingerprint): full report, breaking changes, scores,\nand linked receipt metadata if stored.\n\nUse this when:\n- You have a decision_id (or fingerprint) from a previous preflight, PR\n  comment, or CI log and need to inspect or explain that past decision.\n- You are auditing why a prior ALLOW/WARN/BLOCK was issued.\n- You are NOT requesting a new analysis of current before/after specs.\n\nDo not use when:\n- You need a decision for the CURRENT uncommitted or PR head change set —\n  call coderifts.preflight_change_set with the current artifacts.\n- You hold a receipt token and only need cryptographic/lifecycle verification —\n  use coderifts.verify_receipt.\n- You have no identifier — run preflight first to create one.\n\nInputs: exactly one of case_id, decision_id, or fingerprint. {} → INVALID_INPUT;\ntwo identifiers → LOOKUP_IDENTIFIER_CONFLICT; case_id → CASE_NOT_FOUND\n(lookup never opens a case). Returns the stored document or not_found.\n\nScoping — fingerprint lookup returns only YOUR OWN decisions. A fingerprint is\nderived from content, not from an account, so two callers who preflight\nbyte-identical specs derive the same one; the lookup is therefore constrained\nto the decisions your credential can prove it owns.\n\nA decision that exists but is not yours returns the SAME not_found as one that\nwas never issued. This is deliberate: a distinguishable \"exists but forbidden\"\nwould confirm to any caller that a given content hash had been decided on by\nsomeone, which is the fact the scoping exists to withhold. Do not read\nnot_found as proof that no such decision exists anywhere.\n\nDecisions persisted without context.repository cannot currently be attributed\nto an account, and are not retrievable by fingerprint at all — not by their\nowner either. Retrieve those by decision_id, which is unchanged and unscoped.\nThis is a limitation of what older stored rows carry, not a property of the\nlookup: rows written from now on record the account directly, so the gap\nnarrows as older rows age out. If a fingerprint you expect returns not_found,\nuse the decision_id before concluding the decision is missing.\n\nWhen the stored envelope carries control fields, control_envelope.next_agent_step\nis structured remediation guidance the agent MAY follow for non-CONTINUE\nexecution_action values (null on CONTINUE*). Still branch on execution_action;\nnext_agent_step is a suggestion, not permission.",
       "inputSchema": {
         "type": "object",
+        "description": "Closed exclusive identifier union: exactly one of case_id | decision_id | fingerprint. Encoded as minProperties=1 + maxProperties=1 + additionalProperties=false, NOT as a top-level oneOf/anyOf/allOf — Anthropic (and other strict tool APIs) reject those combinators at the root of input_schema and then refuse the entire tools array (measured: test/mcp-input-oneof-honesty.test.js, mcp-streamable.js comment). The server enforces the same mutex with named codes: empty {} → INVALID_INPUT; two or more identifiers → LOOKUP_IDENTIFIER_CONFLICT; case_id alone → CASE_NOT_FOUND (no case store yet; lookup never opens a case).",
         "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A case identifier. Lookup never opens a case. Until the case store exists this returns CASE_NOT_FOUND."
+          },
           "decision_id": {
             "type": "string",
             "minLength": 1,
-            "description": "The decision_id from a prior decision_result envelope. Provide this and/or fingerprint (at least one non-empty string required)."
+            "description": "The decision_id from a prior decision_result envelope. Provide exactly one identifier."
           },
           "fingerprint": {
             "type": "string",
             "minLength": 1,
-            "description": "A verdict fingerprint (sha256:...); returns the latest matching decision. Provide this and/or decision_id (at least one non-empty string required)."
+            "description": "A verdict fingerprint (sha256:...); returns the latest matching decision you own. Provide exactly one identifier."
           }
         },
         "minProperties": 1,
+        "maxProperties": 1,
         "additionalProperties": false
       },
       "annotations": {
