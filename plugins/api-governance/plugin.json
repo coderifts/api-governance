@@ -2,7 +2,7 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "coderifts",
   "version": "1.0.0",
-  "description": "Signed, offline-verifiable authorization for AI-agent contract changes. Only a granted change can proceed.",
+  "description": "Signed, offline-verifiable authorization for AI-agent contract changes. Only a granted change can proceed. The verdict is deterministic — the same change set yields the same verdict, not a model's judgement — and branching is fail-closed: an unrecognised execution_action is not permission. Three MCP tools: preflight_change_set, verify_receipt, get_decision_details.",
   "author": {
     "name": "CodeRifts",
     "email": "peter@coderifts.com",

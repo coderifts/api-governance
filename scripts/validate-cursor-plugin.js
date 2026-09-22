@@ -123,7 +123,20 @@ if (mustExist(pluginJsonPath, '.cursor-plugin/plugin.json exists')) {
       ok('plugin.json variables declares CODERIFTS_API_KEY');
     }
 
-    if (typeof pj.description !== 'string' || !/deterministic/i.test(pj.description) || !/fail-closed/i.test(pj.description)) {
+    // ⚠ THE SEPARATOR IS OPTIONAL, AND THE CHARACTER CLASS IS A MEASUREMENT. The rule used to
+    // require `fail-closed` exactly, while the kit's OWN skill file — byte-identical to the
+    // website well-known, and checked for that below — writes it with a SPACE: "An unrecognised
+    // `execution_action` is not permission — fail closed". coderifts.com/agents/quickstart writes
+    // "anything unrecognised fails closed". A rule that rejects the product's own phrasing
+    // teaches people to write around it.
+    //
+    // ⚠ `fail-?closed` WOULD NOT HAVE FIXED THIS, and a planted control said so: `-?` makes the
+    // HYPHEN optional, it does not admit a space, so "fail closed" — the exact form in our own
+    // SKILL.md — stayed a failure while "failclosed" started passing. The class is [-\s] so the
+    // three spellings that actually occur all pass. Nothing else is loosened: `strict`,
+    // `fail open` and a missing clause are all still failures, which is the point of the rule.
+    const DIFFERENTIATORS = [/deterministic/i, /fail[-\s]?closed/i];
+    if (typeof pj.description !== 'string' || !DIFFERENTIATORS.every((re) => re.test(pj.description))) {
       fail('plugin.json description differentiator', 'must state deterministic + fail-closed vs AI scan');
     } else {
       ok('plugin.json description carries deterministic/fail-closed differentiator');

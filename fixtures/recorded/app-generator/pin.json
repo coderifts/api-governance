@@ -68,6 +68,16 @@
       "sha256": "91adac7e03bc080ae818be6a441a4dfff6215a5be4168838b9ca4007e165bc8c",
       "bytes": 5036,
       "app_path": "generated/agent-host/openai-agent-instructions.md"
+    },
+    {
+      "path": "agent-host/skills/api-governance/SKILL.md",
+      "role": "agent-host-skill",
+      "sha256": "7a123ab63c58cc474e7307fb9998f79cc0b9594a3400705911e5098fde13d948",
+      "bytes": 5194,
+      "app_path": "generated/agent-host/skills/api-governance/SKILL.md",
+      "_why": "RECORDED 2026-09-22. This is the SKILL.md that `coderifts init --agents` writes INTO A PARTNER REPOSITORY, and until now it was the only generated carrier in neither this pin nor validate-rule-provenance.mjs RULE_CARRIERS — the file with the widest blast radius was the one with no record on either side. Recording it is the prerequisite for gating it; it is NOT itself a gate, because nothing machine-reads this file yet.",
+      "_not_the_canonical_skill": "Deliberately NOT the same body as coderifts-app agent/skills/coderifts/SKILL.md. Measured 2026-09-22: the two are COMPLEMENTARY. The canonical skill carries the deny protocol (machine_action, same_case, RETRY_BUDGET_EXHAUSTED, UNTRUSTED_INPUT) that this rule does not; this rule carries the grant surfaces (scope_hash, state_nonce, commit_observation, include_execution_grant, ENFORCING_STRICT, derivation:\"server\") that the canonical skill does not, and the canonical skill fails assertShippedSurfaceTokens on twelve tokens. Replacing one with the other DELETES published content. Do not 'canonicalise' this file without deciding what happens to the missing half."
     }
-  ]
+  ],
+  "_artifacts_note": "Eight rule/MCP artifacts plus, from 2026-09-22, the agent-host SKILL.md. The Claude, Cursor and Codex plugin SKILL.md files remain UNRECORDED: the Claude one is byte-gated in the app (generate-claude-package.js --check --marketplace), the other two are hand-authored channel documents with no generator. See the app's scripts/lib/marketplace-carrier.js CARRIERS roster for all seven and what writes each."
 }
