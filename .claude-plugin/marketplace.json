@@ -11,7 +11,7 @@
       "name": "api-governance",
       "source": "./plugins/api-governance",
       "description": "Contract-change authorization over the hosted MCP server: preflight_change_set decides whether a change may proceed, verify_receipt checks a decision offline, get_decision_details explains a past one. Plus a skill that runs before merging or shipping a contract change.",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": {
         "name": "CodeRifts",
         "email": "peter@coderifts.com"
