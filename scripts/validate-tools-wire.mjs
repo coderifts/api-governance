@@ -34,6 +34,13 @@ const digest = (t) => `sha256:${createHash('sha256').update(canonical(t), 'utf8'
 
 const fail = (m) => { console.error(`validate-tools-wire: FAIL — ${m}`); process.exit(1); };
 
+/**
+ * The live endpoint, overridable ONLY so the negative control can point it at something that
+ * answers 502. ⚠ Named CODERIFTS_TOOLS_WIRE_LIVE_URL rather than a bare LIVE_URL: an override this
+ * powerful should be impossible to set by accident, and impossible to miss in a process listing.
+ */
+const LIVE_URL = process.env.CODERIFTS_TOOLS_WIRE_LIVE_URL || LIVE;
+
 const doc = JSON.parse(readFileSync(FILE, 'utf8'));
 
 // 1. The file must be self-consistent before it is compared to anything.
@@ -61,22 +68,59 @@ for (const t of doc.tools) {
 //     or tag being gone, which is a real verdict.
 // The skip is printed at warning volume and names what was NOT checked. A silent skip is how the
 // website vendoring gate went unnoticed for five days.
+//
+// ⚠ AND THE SKIP IS MODE-AWARE SINCE 2026-09-23, because "loudly, exit 0" is the right answer on a
+// pull request and the WRONG one on a schedule.
+//
+// The schedule exists for one reason: the wire target can go stale without anything in this repo
+// changing, so push and PR alone would never notice. A scheduled run that skips has achieved
+// EXACTLY NOTHING and reports success — the same silent green the schedule was added to replace.
+// Worse than no schedule, because the green is now on the record.
+//
+// On a PR the opposite holds. A contributor's change must not go red because somebody else's server
+// had a bad minute; that is how people learn to re-run until green.
+//
+// ⚠ THE HAZARD IS MEASURED, not hypothetical. On 2026-09-23 app.coderifts.com answered HTTP 502 for
+// roughly a minute — four independent live gates in the website repo went red together and green on
+// retry. Had that minute landed on the 06:17 UTC cron, this validator would have skipped and the
+// scheduled run would have said `success`. MEASURED across the last 20 runs of validate.yml: no skip
+// has actually occurred yet (every run that reached this step printed OK; the 2026-09-22 scheduled
+// failure was the Cursor-plugin step, which runs BEFORE this one and never let it start). This is a
+// latent defect being closed before it fires, not a post-mortem.
+//
+// ⚠ THE MODE IS A FLAG, NOT A SNIFFED ENVIRONMENT VARIABLE. A script that changes its verdict from
+// ambient state is hard to test and easy to mis-trigger; the workflow states the intent, the script
+// obeys it, and the negative control drives the same flag a human would.
+const REQUIRE_LIVE = process.argv.includes('--require-live');
+
 const skip = (m) => {
+  if (REQUIRE_LIVE) {
+    console.error(`\nvalidate-tools-wire: FAIL — LIVE COMPARISON WAS REQUIRED AND DID NOT HAPPEN\n    ${m}\n`
+      + '    This run was started with --require-live, which is what the SCHEDULED workflow path uses.\n'
+      + '    The schedule exists because the live surface can move without anything in this repo\n'
+      + '    changing: a scheduled run that skips the comparison has achieved nothing, and reporting\n'
+      + '    success for it puts a green on the record that no measurement backs.\n'
+      + '    This is NOT a claim that the surface moved. It is a refusal to claim it did not.\n'
+      + '    On a pull request the same condition is a warning and exits 0 — see the note above.\n');
+    process.exit(1);
+  }
   console.error(`\n!!  validate-tools-wire SKIPPED — NOT VERIFIED  !!\n    ${m}\n`
     + '    tools.wire.v1.json was NOT compared against the live surface. If the surface moved and\n'
-    + '    this file was not regenerated, this run did not catch it.\n');
+    + '    this file was not regenerated, this run did not catch it.\n'
+    + '    Exit 0 because this run did not ask for live evidence. The scheduled path does\n'
+    + '    (--require-live) and fails on exactly this line.\n');
   process.exit(0);
 };
 
 let res;
 try {
-  res = await fetch(LIVE, {
+  res = await fetch(LIVE_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
   });
 } catch (err) {
-  skip(`transport error reaching ${LIVE}: ${err?.message}`);
+  skip(`transport error reaching ${LIVE_URL}: ${err?.message}`);
 }
 if (!res.ok) {
   if (res.status === 404 || res.status === 403) fail(`live tools/list returned HTTP ${res.status} — the endpoint is gone, not unreachable`);
