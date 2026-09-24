@@ -102,7 +102,9 @@ that host loop — not as a Claude-style PreToolUse hook. Full steps + one canon
 npm run smoke:openai-dispatch
 ```
 
-As of 2026-09-14 this command **fails on one assertion** (`ALLOW factory ran — execute() did not run`; the remaining ALLOW and BLOCK assertions pass). Investigation is in progress.
+⚠ **Still failing on the same one assertion, re-measured 2026-09-24**: `ALLOW factory ran — execute() did not run`. The other eight assertions pass (4 ALLOW, 5 BLOCK), and the BLOCK side — the side that matters for a gate — is fully green: the factory does not run, the content is the gate denial with no fabricated success, and the decision identity is surfaced. The failing assertion is on the ALLOW path, where the dispatch wrapper returns the function result without having invoked the injected factory.
+
+The 2026-09-14 version of this note ended "Investigation is in progress." That was dropped rather than re-dated: ten days on, it is a claim about activity that nothing here can verify, and a README that reports its own diligence is reporting the one thing a reader cannot check. What a reader can check is the assertion name and today's date.
 
 Local checkout in Codex (team marketplace path):
 
@@ -185,7 +187,7 @@ CodeRifts runs as a hosted **Streamable HTTP** MCP server. Any MCP-compatible ag
 
 - **Endpoint:** `https://app.coderifts.com/mcp`
 - **Transport:** Streamable HTTP (protocol version `2025-06-18`)
-- **Server:** `CodeRifts API Governance` `v1.0.2`
+- **Server:** `CodeRifts API Governance` `v1.0.3` — read from `initialize` → `result.serverInfo.version` on 2026-09-24. A version typed into a README is a claim with a date on it; `npm run validate:tools-wire` compares the TOOLS to the live server on every push, pull request and daily cron, but nothing compares this line, so re-read it rather than trust it.
 - **Auth:** `initialize` and `tools/list` are open (no key); `tools/call` requires an API key - send `Authorization: Bearer <key>` or `X-API-Key: <key>`.
 
 ### Connect
@@ -262,7 +264,7 @@ Decision logic is deterministic: a single breaking change is never silently allo
 
 ## Also available
 
-- **GitHub App** (zero-config, one-click install) on the GitHub Marketplace - posts a four-gate governance report (API contract, schema-vs-code, auth surface, workflow actions) on every pull request.
+- **GitHub App** on the GitHub Marketplace — installs without configuration and posts a signed contract-change decision (ALLOW / WARN / REQUIRE_APPROVAL / BLOCK) on every pull request, across four gates: API contract, schema-vs-code, auth surface and workflow actions. ⚠ It **reports** by default: the check's phase-1 conclusion is clamped to `neutral` and `MERGEGATE_ENFORCE` defaults false, so it prevents a merge only once the check is *required* on the branch and that variable is on. The platform truth table is the source of truth for that distinction: <https://coderifts.com/docs/platform-truth-table/>
 - **SDKs:** `@coderifts/sdk` (TypeScript / npm), `coderifts-sdk` (Python / PyPI).
 - **CLI:** `coderifts` (npm) with a pre-push hook.
 - **Integrations:** Backstage plugin, VS Code extension, LangGraph / AutoGen / CrewAI.
