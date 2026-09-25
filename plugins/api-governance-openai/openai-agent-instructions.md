@@ -30,7 +30,7 @@ CodeRifts reports a governance decision and `execution_action`; it does not by i
 
 To act (mutate a contract, merge, deploy, or publish): call `preflight_change_set` with `preflight_mode` authorize. Analyze is informational — risk only, `may_execute` is always false — and is not permission. Read `execution_action` on the `decision_result` envelope.
 
-Before acting under a held receipt: call `verify_receipt` with the intended `context` (operation, environment, repository, branch, pull_request) for THIS attempt. Do not act on a receipt whose scope does not match.
+Before acting under a held receipt: call `verify_receipt` with the intended `context` (operation, environment, repository, branch, pull_request) for THIS attempt AND `target_id` set to `decision_result.artifact_digest`. Do not act on a receipt whose scope does not match. Without `target_id` the answer is `currently_authorized: false` with `authz_reason` `target_not_stated` — a missing input, not a refusal.
 
 Act only when `currently_authorized` is true (`control_envelope.receipt_view.currently_authorized`). A valid-looking token is not permission if `currently_authorized` is false or omitted.
 
