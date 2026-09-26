@@ -15,6 +15,30 @@ Every decision also names what it does not prove.
 
 ---
 
+## Install
+
+```text
+# Claude Code
+/plugin marketplace add coderifts/api-governance
+/plugin install api-governance@coderifts
+
+# Any MCP client (Streamable HTTP) — add to its MCP config
+{ "mcpServers": { "coderifts": { "url": "https://app.coderifts.com/mcp",
+  "headers": { "Authorization": "Bearer <YOUR_CODERIFTS_API_KEY>" } } } }
+
+# SDKs
+npm install @coderifts/sdk
+pip install coderifts-sdk
+```
+
+GitHub Copilot reads the same server under three different root keys — `servers` in
+`.vscode/mcp.json`, `mcpServers` in the cloud agent's MCP settings, and `mcp-servers` in a custom
+agent's frontmatter — and `npx coderifts copilot-setup` writes all three (details below).
+
+A key is needed only to authorize; get one at `https://app.coderifts.com/api/signup`.
+
+---
+
 ## Claude Code plugin
 
 Install the CodeRifts marketplace, then the `api-governance` plugin (MCP server + skill).
@@ -64,12 +88,6 @@ The generated-rule check is **LIVE** when `CODERIFTS_APP_ROOT` (default `~/coder
 has `generated/agent-host/.cursor/rules/coderifts.mdc`, and **RECORDED** against
 `fixtures/recorded/app-generator` when it does not (weaker, named). A missing or
 corrupt snapshot still exits 1 — no silent skip.
-
-**Peter — local Cursor load before publish:** symlink or add
-`plugins/api-governance-cursor` as a local plugin, exercise skill + rule + MCP +
-hook, then submit `https://github.com/coderifts/api-governance` at
-[cursor.com/marketplace/publish](https://cursor.com/marketplace/publish)
-(open-source, Cursor review).
 
 ---
 
@@ -188,7 +206,7 @@ CodeRifts runs as a hosted **Streamable HTTP** MCP server. Any MCP-compatible ag
 - **Endpoint:** `https://app.coderifts.com/mcp`
 - **Transport:** Streamable HTTP (protocol version `2025-06-18`)
 - **Server:** `CodeRifts API Governance` `v1.0.3` — read from `initialize` → `result.serverInfo.version` on 2026-09-24. A version typed into a README is a claim with a date on it; `npm run validate:tools-wire` compares the TOOLS to the live server on every push, pull request and daily cron, but nothing compares this line, so re-read it rather than trust it.
-- **Auth:** `initialize` and `tools/list` are open (no key); `tools/call` requires an API key - send `Authorization: Bearer <key>` or `X-API-Key: <key>`.
+- **Auth:** `initialize`, `tools/list` and an **analyze** `tools/call` need no key (measured live 2026-09-26). An **authorize** call mints a signed receipt and needs an API key — send `Authorization: Bearer <key>` or `X-API-Key: <key>`.
 
 ### Connect
 
@@ -218,7 +236,27 @@ Expected: a JSON-RPC `result` with `serverInfo` and `capabilities.tools`.
 
 ### Try without a key
 
-Two public endpoints need no auth at all:
+An analyze call over MCP needs no key:
+
+```bash
+curl -sS https://app.coderifts.com/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"preflight_change_set","arguments":{"preflight_mode":"analyze","artifacts":[{"id":"api","type":"openapi","before":"openapi: 3.0.0\ninfo: {title: Pets, version: 1.0.0}\npaths:\n  /pets:\n    get:\n      responses:\n        \"200\":\n          description: ok\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  id: {type: string}\n                  name: {type: string}\n","after":"openapi: 3.0.0\ninfo: {title: Pets, version: 1.0.0}\npaths:\n  /pets:\n    get:\n      responses:\n        \"200\":\n          description: ok\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  id: {type: string}\n"}]}}}'
+```
+
+Measured response (live, 2026-09-26 — removing `name` from `GET /pets`), in the tool result:
+
+```json
+{ "preflight_mode": "analyze", "analysis_outcome": "BREAKS_DETECTED",
+  "authorization_effect": "NONE", "may_execute": false, "receipt_kind": "NONE",
+  "breaking_changes": 1, "risk_score": 14 }
+```
+
+That is information, not permission: `may_execute` is `false` on every analyze answer. To act,
+call again with `preflight_mode: "authorize"` and `context.operation`, with a key.
+
+Two public REST endpoints need no auth at all:
 
 ```bash
 curl -s "https://app.coderifts.com/api/v1/public/preflight?url=https://petstore3.swagger.io/api/v3/openapi.json"
@@ -254,8 +292,8 @@ On the **authorize** path of `preflight_change_set`, the decision envelope inclu
 ## How agents use it
 
 1. Before merging an API change (or before an agent acts on a contract change), call `preflight_change_set` with full before/after artifacts and `preflight_mode: "authorize"` (plus `context.operation`).
-2. Read `execution_action` / `decision`: CONTINUE/ALLOW proceeds, WARN flags, REQUIRE_APPROVAL pauses for a human, STOP/BLOCK stops the merge / aborts the agent step.
-3. If you already hold a receipt and only need to confirm it is still valid, call `verify_receipt` — do not re-preflight unless the change set or operation changed.
+2. Branch on `execution_action` only: `CONTINUE` proceeds, `CONTINUE_WITH_MONITORING` proceeds with a wired monitoring sink, `REQUEST_APPROVAL` pauses for a human, `STOP` stops the merge / aborts the agent step. Any other value is not permission — fail closed.
+3. Before acting under the receipt you hold, call `verify_receipt` with the same context the preflight was made under, and act only when `currently_authorized` is `true`. Do not re-preflight unless the change set or operation changed.
 4. To inspect a prior decision by id, call `get_decision_details`.
 
 Decision logic is deterministic: a single breaking change is never silently allowed. *Tests can pass and still ship a broken contract — CodeRifts checks the contract itself at PR time.*
@@ -265,7 +303,7 @@ Decision logic is deterministic: a single breaking change is never silently allo
 ## Also available
 
 - **GitHub App** on the GitHub Marketplace — installs without configuration and posts a signed contract-change decision (ALLOW / WARN / REQUIRE_APPROVAL / BLOCK) on every pull request, across four gates: API contract, schema-vs-code, auth surface and workflow actions. ⚠ It **reports** by default: the check's phase-1 conclusion is clamped to `neutral` and `MERGEGATE_ENFORCE` defaults false, so it prevents a merge only once the check is *required* on the branch and that variable is on. The platform truth table is the source of truth for that distinction: <https://coderifts.com/docs/platform-truth-table/>
-- **SDKs:** `@coderifts/sdk` (TypeScript / npm), `coderifts-sdk` (Python / PyPI).
+- **SDKs:** `npm install @coderifts/sdk` (TypeScript), `pip install coderifts-sdk` (Python).
 - **CLI:** `coderifts` (npm) with a pre-push hook.
 - **Integrations:** Backstage plugin, VS Code extension, LangGraph / AutoGen / CrewAI.
 
