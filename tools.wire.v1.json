@@ -1,11 +1,11 @@
 {
   "schema": "coderifts.tools-wire.v1",
   "tool_count": 3,
-  "tools_sha256": "sha256:7d6fe4a0d5ef31a4cec82aaa0762c4434a246899233ff13321fe08b5cf8475d2",
+  "tools_sha256": "sha256:cb989871bb8376655bff573cb074ecac1e367a2393a88aff067055c07722ecb6",
   "tools": [
     {
       "name": "preflight_change_set",
-      "description": "Use this when: a contract artifact (OpenAPI, GraphQL, protobuf, AsyncAPI, MCP manifests, or agent tool schemas) changes before merge, deploy, publish, or tool registration; AND any agent-executed operation with no supported contract type — send type agent_operation. Do not call for documentation-only changes, static readiness scoring, or receipt verification. Use analyze for risk only; authorize requires context.operation. Skipping this call is not permission. Absence of a key is not permission. Inputs: preflight_mode is required: \"analyze\" (risk only; no receipt, no execution_action) or \"authorize\" (may mint a receipt; requires context.operation — merge is not deploy is not publish). Supply exactly one artifact source: artifacts[] (1–20 items, each {id, type, before, after} as the FULL spec/schema text, not a path or URL; type is openapi|graphql|grpc|asyncapi|mcp_manifest|agent_tools|agent_operation) XOR derivation=\"server\" (server reads GitHub Compare; needs context.repository + context.base + context.head; sending artifacts[] together is 400). Grant fields (include_execution_grant, grant_version, tenant_id, executor_id, adapter_id, target_uri, expected_state_token, state_nonce, policy_hash) apply only when preflight_mode=\"authorize\" AND include_execution_grant=true; analyze ignores them. previous_receipt is a chain token base64url(body).base64url(signature) to LINK a prior decision — it does not re-verify; use coderifts.verify_receipt instead; for details of a past decision use coderifts.get_decision_details instead. idempotency_key replays authorize only (24h), never analyze.",
+      "description": "Use this when: a contract artifact (OpenAPI, GraphQL, protobuf, AsyncAPI, MCP manifests, or agent tool schemas) changes before merge, deploy, publish, or tool registration; AND any agent-executed operation with no supported contract type — send type agent_operation. Do not call for documentation-only changes, static readiness scoring, or receipt verification. Use analyze for risk only; authorize requires context.operation. Skipping this call is not permission. Absence of a key is not permission. Inputs: preflight_mode is required: \"analyze\" (risk only; no receipt, no execution_action) or \"authorize\" (may mint a receipt; requires context.operation — merge is not deploy is not publish). Supply exactly one artifact source: artifacts[] (1–20 items, each {id, type, before, after} as the FULL spec/schema text, not a path or URL; type is openapi|graphql|grpc|asyncapi|mcp_manifest|agent_tools|agent_operation) XOR derivation=\"server\" (server reads GitHub Compare; needs context.repository + context.base + context.head; sending artifacts[] together is 400). Grant fields sit in one object, execution_grant_request {include_execution_grant, grant_version, tenant_id, executor_id, adapter_id, target_uri, expected_state_token, state_nonce, audience, policy_hash}; analyze ignores it; required is preflight_mode only. previous_receipt is a chain token base64url(body).base64url(signature) to LINK a prior decision — it does not re-verify; use coderifts.verify_receipt instead; for details of a past decision use coderifts.get_decision_details instead. idempotency_key replays authorize only (24h), never analyze.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -116,51 +116,66 @@
             "type": "string",
             "description": "Optional prior chain token to LINK this call into a receipt chain: base64url(body).base64url(signature). Linking is not verification — a linked token is not re-checked here; use verify_receipt."
           },
-          "include_execution_grant": {
-            "type": "boolean",
-            "description": "Authorize only. When true on an allow-class authorize, the response includes a signed execution_grant, or HTTP 503 SIGNER_UNAVAILABLE — never an unsigned grant. Default false. Analyze ignores this flag. Ignored unless preflight_mode=\"authorize\"."
+          "execution_grant_request": {
+            "type": "object",
+            "description": "Authorize + include_execution_grant only: the execution-grant request fields. Analyze ignores them. Flat root-level spellings are also accepted; the same field sent both ways with different values is INVALID_INPUT.",
+            "properties": {
+              "include_execution_grant": {
+                "type": "boolean",
+                "description": "Authorize only. When true on an allow-class authorize, the response includes a signed execution_grant, or HTTP 503 SIGNER_UNAVAILABLE — never an unsigned grant. Default false. Analyze ignores this flag. Ignored unless preflight_mode=\"authorize\"."
+              },
+              "state_nonce": {
+                "type": "string",
+                "description": "Authorize+grant only. Opaque nonce copied into the signed grant as its own field (not folded into scope_hash). Absent → BEARER grant. Ignored unless include_execution_grant is true."
+              },
+              "grant_version": {
+                "type": "string",
+                "enum": [
+                  "v1",
+                  "v2"
+                ],
+                "x-coderifts-effective-default": "v2",
+                "x-coderifts-default-changes-at": "2026-09-18",
+                "description": "Grant envelope to mint when include_execution_grant is true. Omitting this yields cr.exec.v1 until 2026-09-18 and cr.exec.v2 on and after it (see x-coderifts-effective-default / x-coderifts-default-changes-at). The response meta.grant_version is the version actually issued. An explicit value always wins — pin \"v1\" to keep current behaviour with no code change on the date."
+              },
+              "tenant_id": {
+                "type": "string",
+                "description": "Authorize+grant v2 only. Tenant the grant is issued under. ASCII slug. When omitted the server uses \"default\" — pin it if you are not on the default tenant."
+              },
+              "executor_id": {
+                "type": "string",
+                "description": "Authorize+grant v2 only. Executor identity the grant is bound to (example: agent:ci-bot, host:github-actions). Empty/absent is not \"any executor\"."
+              },
+              "adapter_id": {
+                "type": "string",
+                "description": "Authorize+grant v2 only. Adapter that will apply the change. Conventional values: fs, postgres, git. Must match the adapter the executor actually uses; a git grant does not authorize an fs write."
+              },
+              "target_uri": {
+                "type": "string",
+                "description": "Authorize+grant v2 only. URI the grant binds (example: git://owner/repo.git/refs/heads/main). Fallback if omitted: context.target_uri, then repository/head-derived. Distinct from context.target_id."
+              },
+              "expected_state_token": {
+                "type": "string",
+                "description": "Authorize+grant v2 only. Compare-and-swap token the executor must observe at apply time (the \"before\" state). Signed as its own field. Omit only if the adapter has no prior state; do not send a placeholder."
+              },
+              "audience": {
+                "type": "string",
+                "description": "Requester identity for the decision envelope. Accepted here; the server-derived audience wins when both are present."
+              },
+              "policy_hash": {
+                "type": "string",
+                "description": "Authorize+grant v2 only. Policy identity bound into the grant, sha256: + 64 hex. When supplied, apply must use that same policy; a different policy is a different grant."
+              }
+            }
           },
-          "state_nonce": {
-            "type": "string",
-            "description": "Authorize+grant only. Opaque nonce copied into the signed grant as its own field (not folded into scope_hash). Absent → BEARER grant. Ignored unless include_execution_grant is true."
-          },
-          "grant_version": {
+          "response_detail": {
             "type": "string",
             "enum": [
-              "v1",
-              "v2"
+              "control",
+              "standard",
+              "full"
             ],
-            "x-coderifts-effective-default": "v2",
-            "x-coderifts-default-changes-at": "2026-09-18",
-            "description": "Grant envelope to mint when include_execution_grant is true. Omitting this yields cr.exec.v1 until 2026-09-18 and cr.exec.v2 on and after it (see x-coderifts-effective-default / x-coderifts-default-changes-at). The response meta.grant_version is the version actually issued. An explicit value always wins — pin \"v1\" to keep current behaviour with no code change on the date."
-          },
-          "tenant_id": {
-            "type": "string",
-            "description": "Authorize+grant v2 only. Tenant the grant is issued under. ASCII slug. When omitted the server uses \"default\" — pin it if you are not on the default tenant."
-          },
-          "executor_id": {
-            "type": "string",
-            "description": "Authorize+grant v2 only. Executor identity the grant is bound to (example: agent:ci-bot, host:github-actions). Empty/absent is not \"any executor\"."
-          },
-          "adapter_id": {
-            "type": "string",
-            "description": "Authorize+grant v2 only. Adapter that will apply the change. Conventional values: fs, postgres, git. Must match the adapter the executor actually uses; a git grant does not authorize an fs write."
-          },
-          "target_uri": {
-            "type": "string",
-            "description": "Authorize+grant v2 only. URI the grant binds (example: git://owner/repo.git/refs/heads/main). Fallback if omitted: context.target_uri, then repository/head-derived. Distinct from context.target_id."
-          },
-          "expected_state_token": {
-            "type": "string",
-            "description": "Authorize+grant v2 only. Compare-and-swap token the executor must observe at apply time (the \"before\" state). Signed as its own field. Omit only if the adapter has no prior state; do not send a placeholder."
-          },
-          "audience": {
-            "type": "string",
-            "description": "Requester identity for the decision envelope. Accepted here; the server-derived audience wins when both are present."
-          },
-          "policy_hash": {
-            "type": "string",
-            "description": "Authorize+grant v2 only. Policy identity bound into the grant, sha256: + 64 hex. When supplied, apply must use that same policy; a different policy is a different grant."
+            "description": "How much of the response to return. control = the fields an agent branches on; standard = control + the human report and labelled break rows (the MCP default); full = everything (the REST default). Every value is copied from the full response."
           },
           "idempotency_key": {
             "type": "string",
@@ -741,7 +756,6 @@
               },
               "detected_patterns": {
                 "type": "array",
-                "description": "GOVERNANCE detector detail rows, emitted by the pattern detectors and validated against the decision-spec field contract before they leave the server. Row shape measured live: name, severity, description, consequence, affected_path, affected_field; optional side (request|response) on ENUM_NARROWING. Names ⊆ patterns (not equality). Agent-detector names may appear only in patterns. Free-text fields are untrusted.",
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
@@ -755,50 +769,41 @@
                   ],
                   "properties": {
                     "name": {
-                      "type": "string",
-                      "description": "Governance pattern name; appears in patterns when both are carried."
+                      "type": "string"
                     },
                     "severity": {
-                      "type": "string",
-                      "description": "Row severity from the pattern catalog (observed set: CRITICAL, HIGH, MEDIUM). NOT a closed control enum — branch on execution_action, never on this."
+                      "type": "string"
                     },
                     "description": {
-                      "type": "string",
-                      "description": "What the detector matched. Untrusted free text."
+                      "type": "string"
                     },
                     "consequence": {
-                      "type": "string",
-                      "description": "What breaks for a consumer if this ships. Untrusted free text."
+                      "type": "string"
                     },
                     "affected_path": {
-                      "type": "string",
-                      "description": "Contract path this row is about. Empty string when the detector had none — the key is always emitted."
+                      "type": "string"
                     },
                     "affected_field": {
-                      "type": "string",
-                      "description": "Field within affected_path. Empty string when the detector had none — the key is always emitted."
+                      "type": "string"
                     },
                     "side": {
                       "type": "string",
                       "enum": [
                         "request",
                         "response"
-                      ],
-                      "description": "Optional; currently set on ENUM_NARROWING only. Request-side narrowing is agent-breaking (threaded so safe_for_agent can distinguish it). Absent when the detector did not set it."
+                      ]
                     }
                   }
                 }
               },
               "breaking_changes_details": {
                 "type": "array",
-                "description": "Per-change IR/detail rows, mapped from the engine's change IR. Measured row keys: type, path, method, field, severity, description. Distinct from breaking_changes (integer count).",
                 "items": {
                   "type": "object",
                   "additionalProperties": true,
                   "properties": {
                     "type": {
-                      "type": "string",
-                      "description": "Change kind / IR type code (e.g. response.body.property.remove)."
+                      "type": "string"
                     },
                     "path": {
                       "type": "string"
@@ -820,20 +825,16 @@
               },
               "severity_summary": {
                 "type": "object",
-                "description": "Bundle severity axes, computed once per change set. Distinct axes, not contradictory. Measured keys: diff_severity, governance_severity, policy_effect, note.",
                 "additionalProperties": false,
                 "properties": {
                   "diff_severity": {
-                    "type": "string",
-                    "description": "Structural size of the schema change."
+                    "type": "string"
                   },
                   "governance_severity": {
-                    "type": "string",
-                    "description": "How the rule engine rates the change."
+                    "type": "string"
                   },
                   "policy_effect": {
-                    "type": "string",
-                    "description": "Resulting decision effect label."
+                    "type": "string"
                   },
                   "note": {
                     "type": "string"
@@ -843,7 +844,6 @@
               "decision_basis": {},
               "analysis": {
                 "type": "object",
-                "description": "Tier-2 analysis mirror, assembled by the response builder alongside the control surface. Dual-write of the flat analysis fields present on the verdict, plus remediations[]. PROPERTIES ARE GENERATED — do not hand-edit them. OPEN BY DESIGN: additionalProperties stays TRUE and this is not an oversight. The fields above are copied conditionally, so which of them appear depends on the input — a verdict with no PII findings simply omits pii_findings. Closing this object would turn every future analysis field into a breaking change that fails inside the consumer, and would reject exactly the verdict paths that no one sampled when the union was built. Declared, not closed: you can now see what you may get, and you must still tolerate more.",
                 "properties": {
                   "breaking_changes": {
                     "type": "integer"
@@ -902,7 +902,6 @@
                     "type": "array",
                     "items": {
                       "type": "object",
-                      "description": "One remediation for one detected breaking change. `instruction` is imperative prose that a model may read and act on; it is generated per input and is NOT a fixed string, so the schema declares that the field exists and does not pin its text.",
                       "properties": {
                         "change_type": {
                           "type": "string"
@@ -924,8 +923,7 @@
                           "type": "string"
                         },
                         "instruction": {
-                          "type": "string",
-                          "description": "Imperative remediation text. Model-visible. Generated per input; not a closed vocabulary."
+                          "type": "string"
                         },
                         "evidence": {
                           "type": "object",
@@ -970,7 +968,6 @@
               },
               "human_report": {
                 "type": "object",
-                "description": "Human-readable report tier, assembled by the response builder; analyze returns a reduced form. Measured keys: summary, breaking_highlights, suggestions, next_steps_prose.",
                 "additionalProperties": false,
                 "properties": {
                   "summary": {
@@ -1136,8 +1133,7 @@
                 "type": "string"
               },
               "decision_spec_version": {
-                "type": "string",
-                "description": "Decision Spec major for this response (typically '2.0')."
+                "type": "string"
               },
               "coderifts_version": {
                 "type": "string"
@@ -1177,7 +1173,6 @@
               "blast_radius": {
                 "type": "object",
                 "additionalProperties": false,
-                "description": "Additive COUNTS (not a score). Pure function of the change-set + request graphs. Not in the verdict_fingerprint preimage.",
                 "required": [
                   "endpoints",
                   "fields",
@@ -1280,10 +1275,10 @@
     },
     {
       "name": "verify_receipt",
-      "description": "Verify a CodeRifts signed chain-receipt you ALREADY HOLD: cryptographic\nauthenticity (signature + key id), body binding, and — when lifecycle indices\nare available — whether it is currently valid authorization (not expired,\nsuperseded, or revoked) for a stated operation/target.\n\nUse this when:\n- You already obtained a chain_receipt / receipt token from a prior preflight\n  (or CI artifact) and are about to act (merge/deploy) under that receipt.\n- A contract-gate or policy requires offline/online proof that the receipt is\n  authentic for this change before proceeding.\n- You must distinguish \"signature ok\" from \"currently authorized\" (stale or\n  superseded receipts must not be treated as live approval).\n\nDo not use when:\n- You do not have a receipt yet — call coderifts.preflight_change_set first.\n- You need a NEW decision for a changed base→head set — preflight again;\n  verify_receipt does not re-diff specs.\n- The receipt you hold binds a different operation or target than the one you\n  are about to perform — call coderifts.preflight_change_set with\n  context.operation set to that operation (a merge receipt does not authorize\n  a deploy); verify_receipt cannot re-scope or re-issue a decision.\n- You only need human-readable history of an old decision_id without a receipt\n  token — use coderifts.get_decision_details.\n- The change set itself is unknown or incomplete — fix the change set and\n  preflight; do not \"verify\" a placeholder.\n\nInputs: receipt token (required); optional intended context (operation, environment,\nfingerprint, target_id, audience, repository/branch/pull_request, base/head) and the\nbody_hash-bound decision_result envelope. 30s clock-skew leeway on expiry. A 0s\ngrace for declared destructive production operations is defined in the policy but\nis unreachable today: the intended-context schema has no destructive field, so\nnothing can declare one and the 30s leeway always applies.\nReturns { valid, status, currently_authorized (bool|null), reason, payload, authz_* }.\nBranch on currently_authorized; null = not evaluated.\n\nWhen a decision envelope is also in hand (e.g. from a prior preflight), its\ncontrol_envelope.next_agent_step (if present) is structured remediation guidance\nthe agent MAY follow after a non-CONTINUE decision — still branch on\nexecution_action; next_agent_step is suggestion, not permission.",
+      "description": "Verify a CodeRifts signed chain-receipt you ALREADY HOLD: cryptographic\nauthenticity (signature + key id), body binding, and — when lifecycle indices\nare available — whether it is currently valid authorization (not expired,\nsuperseded, or revoked) for a stated operation/target.\n\nUse this when:\n- You already obtained a chain_receipt / receipt token from a prior preflight\n  (or CI artifact) and are about to act (merge/deploy) under that receipt.\n- A contract-gate or policy requires offline/online proof that the receipt is\n  authentic for this change before proceeding.\n- You must distinguish \"signature ok\" from \"currently authorized\" (stale or\n  superseded receipts must not be treated as live approval).\n\nDo not use when:\n- You do not have a receipt yet — call coderifts.preflight_change_set first.\n- You need a NEW decision for a changed base→head set — preflight again;\n  verify_receipt does not re-diff specs.\n- The receipt you hold binds a different operation or target than the one you\n  are about to perform — call coderifts.preflight_change_set with\n  context.operation set to that operation (a merge receipt does not authorize\n  a deploy); verify_receipt cannot re-scope or re-issue a decision.\n- You only need human-readable history of an old decision_id without a receipt\n  token — use coderifts.get_decision_details.\n- The change set itself is unknown or incomplete — fix the change set and\n  preflight; do not \"verify\" a placeholder.\n\nInputs: receipt token (required); target_id = decision_result.artifact_digest — required\nfor an authorization verdict; omitted → target_not_stated. Optional intended context\n(operation, environment, fingerprint, audience, repository/branch/pull_request, base/head)\nand the body_hash-bound decision_result envelope. 30s clock-skew leeway on expiry. A 0s\ngrace for declared destructive production operations is defined in the policy but\nis unreachable today: the intended-context schema has no destructive field, so\nnothing can declare one and the 30s leeway always applies.\nReturns { valid, status, currently_authorized (bool|null), reason, payload, authz_* }.\nBranch on currently_authorized; null = not evaluated.\n\nWhen a decision envelope is also in hand (e.g. from a prior preflight), its\ncontrol_envelope.next_agent_step (if present) is structured remediation guidance\nthe agent MAY follow after a non-CONTINUE decision — still branch on\nexecution_action; next_agent_step is suggestion, not permission.",
       "inputSchema": {
         "type": "object",
-        "description": "Two evaluation modes (schema-documented; no mode discriminator field). SIGNATURE: supply token only — signature + expiry; currently_authorized is null. AUTHORIZATION: also supply intended context (operation, environment, fingerprint, target_id, audience, repository/branch/pull_request, and/or base/head) AND the body_hash-bound decision_result envelope so currently_authorized / authz_status / authz_reason can be evaluated. Token alone is always accepted; omitting the envelope when context fields are present yields a signature verdict plus fail-closed authorization (currently_authorized false), not a schema reject.",
+        "description": "Two evaluation modes (schema-documented; no mode discriminator field). SIGNATURE: supply token only — signature + expiry; currently_authorized is null. AUTHORIZATION: also supply intended context (operation, environment, fingerprint, target_id set to decision_result.artifact_digest, audience, repository/branch/pull_request, and/or base/head) AND the body_hash-bound decision_result envelope so currently_authorized / authz_status / authz_reason can be evaluated. Token alone is always accepted; omitting the envelope when context fields are present yields a signature verdict plus fail-closed authorization (currently_authorized false), not a schema reject.",
         "properties": {
           "token": {
             "type": "string",
@@ -1295,7 +1290,7 @@
           },
           "target_id": {
             "type": "string",
-            "description": "Intended apply-site target the receipt must bind"
+            "description": "REQUIRED to authorize under a held receipt. Set it to decision_result.artifact_digest — the digest of the artifact the receipt was issued for, which you already hold in the decision_result you are passing. The server does NOT derive it for you: it carries YOUR intended apply-site, and taking it from the envelope would compare that document against itself. Omit it and the answer is currently_authorized false with authz_reason target_not_stated and authz_status VERIFIED_TARGET_NOT_STATED — a missing input, distinct from target_mismatch, which means the receipt covers a different target."
           },
           "environment": {
             "type": "string",
@@ -1499,6 +1494,7 @@
               "VERIFIED_UNBOUND_REPOSITORY",
               "VERIFIED_UNBOUND_BRANCH",
               "VERIFIED_UNBOUND_PULL_REQUEST",
+              "VERIFIED_TARGET_NOT_STATED",
               "UNKNOWN_KEY",
               "UNKNOWN_KEY_STATUS",
               "RETIRED_KEY_VALID_AT_ISSUE",
@@ -1537,6 +1533,13 @@
           "authz_reason": {
             "type": "string",
             "description": "When currently_authorized=false: the deny reason (operation_mismatch, decision_not_allow, superseded, expired, target_mismatch, environment_mismatch, …)"
+          },
+          "authz_reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every violation found; the first is authz_reason. [] when authorized. Fix all of them before re-verifying."
           },
           "authz_status": {
             "type": "string",
