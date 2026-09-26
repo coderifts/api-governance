@@ -3,7 +3,7 @@
   "producer": {
     "name": "coderifts-app",
     "repo": "https://github.com/coderifts/app",
-    "commit": "12264a24016d0b4c48000c63c33835739bc823b3",
+    "commit": "f6e6aaedced686ddcbd357fb4020da9e452207c8",
     "generated_last_touched": "6a44047",
     "generator": [
       "scripts/generate-copilot-mcp.js",
@@ -16,8 +16,8 @@
     {
       "path": "cursor/coderifts.mdc",
       "role": "cursor-rule",
-      "sha256": "22a18225e70afa86ee041697a0e021474d7be08b36e8c7f3e261ab177deb0318",
-      "bytes": 5129,
+      "sha256": "e7356880db27e101281bec454a58281d9560dbfdbc8446d549aa4f549907fc10",
+      "bytes": 5416,
       "app_path": "generated/agent-host/.cursor/rules/coderifts.mdc"
     },
     {
@@ -51,29 +51,29 @@
     {
       "path": "copilot/.github/copilot-instructions.md",
       "role": "copilot-instructions",
-      "sha256": "57f7784e2c7a43b906bd6809964a3ba9aec62515bc52acceae58c1cf0bce5b2d",
-      "bytes": 5049,
+      "sha256": "0f7d5850677ce7395a04070fef191f3616da2be00dcebf07dd9ab426a32e254c",
+      "bytes": 5336,
       "app_path": "generated/agent-host/.github/copilot-instructions.md"
     },
     {
       "path": "openai/AGENTS.md",
       "role": "openai-agents",
-      "sha256": "e405c05a1bdfb9f9ec91db37d4e406aed3487460d3ce4591a70267519b613f1a",
-      "bytes": 5029,
+      "sha256": "3cf91dc674c931f8af3f61d7ad0bdd9b86e3fdb0b4ac39c3dc311e6cc261fb67",
+      "bytes": 5316,
       "app_path": "generated/agent-host/AGENTS.md"
     },
     {
       "path": "openai/openai-agent-instructions.md",
       "role": "openai-instructions",
-      "sha256": "91adac7e03bc080ae818be6a441a4dfff6215a5be4168838b9ca4007e165bc8c",
-      "bytes": 5036,
+      "sha256": "ca2632c5ba490f5b952322af50a679b9cfb69ecbf92e2535ec0140c2fc9c0f14",
+      "bytes": 5323,
       "app_path": "generated/agent-host/openai-agent-instructions.md"
     },
     {
       "path": "agent-host/skills/api-governance/SKILL.md",
       "role": "agent-host-skill",
-      "sha256": "7a123ab63c58cc474e7307fb9998f79cc0b9594a3400705911e5098fde13d948",
-      "bytes": 5194,
+      "sha256": "aab8a0b6d0c98af2b5a6acf7dac270aa22633e90fa3bdbf8ce754703dd8d214f",
+      "bytes": 5481,
       "app_path": "generated/agent-host/skills/api-governance/SKILL.md",
       "_why": "RECORDED 2026-09-22. This is the SKILL.md that `coderifts init --agents` writes INTO A PARTNER REPOSITORY, and until now it was the only generated carrier in neither this pin nor validate-rule-provenance.mjs RULE_CARRIERS — the file with the widest blast radius was the one with no record on either side. Recording it is the prerequisite for gating it; it is NOT itself a gate, because nothing machine-reads this file yet.",
       "_not_the_canonical_skill": "Deliberately NOT the same body as coderifts-app agent/skills/coderifts/SKILL.md. Measured 2026-09-22: the two are COMPLEMENTARY. The canonical skill carries the deny protocol (machine_action, same_case, RETRY_BUDGET_EXHAUSTED, UNTRUSTED_INPUT) that this rule does not; this rule carries the grant surfaces (scope_hash, state_nonce, commit_observation, include_execution_grant, ENFORCING_STRICT, derivation:\"server\") that the canonical skill does not, and the canonical skill fails assertShippedSurfaceTokens on twelve tokens. Replacing one with the other DELETES published content. Do not 'canonicalise' this file without deciding what happens to the missing half."
