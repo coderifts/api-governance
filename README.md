@@ -199,6 +199,23 @@ mirror** — `npx coderifts copilot-setup` remains the install path.
 
 ---
 
+## Agent Skill (skills.sh)
+
+```bash
+npx skills add coderifts/api-governance
+```
+
+The skills CLI discovers `skills/api-governance/SKILL.md` at this repository's root and installs it under
+the name **`api-governance`**. Where it lands depends on the agent (the CLI's own table): `.agents/skills/api-governance/`
+for most agents (Codex, Cursor, Gemini CLI, GitHub Copilot, OpenCode, …) and `.claude/skills/api-governance/` for
+Claude Code.
+
+`skills/api-governance/SKILL.md` is **generated** (`node scripts/generate-root-skill.mjs`; `npm run validate:root-skill`
+checks it) from `plugins/api-governance/skills/api-governance/SKILL.md` — the same text, with the frontmatter `name`
+set to the directory name. The plugin copy keeps `name: coderifts`, and skills.sh already lists it under that name
+(`--skill coderifts`, measured 2026-09-27), so the same text is reachable as both `coderifts` and `api-governance`. The website's
+`.well-known/agent-skills/coderifts-api-governance/SKILL.md` is a different rendering (the Cursor plugin's), not this file.
+
 ## MCP server
 
 CodeRifts runs as a hosted **Streamable HTTP** MCP server. Any MCP-compatible agent (Claude Desktop, Cursor, LangGraph, AutoGen, custom) can connect and run governance checks before tool calls or merges.
