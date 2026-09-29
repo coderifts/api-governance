@@ -6,7 +6,7 @@ Do not hand-edit vendored generated files.
 | Path | Role | Source of truth |
 |------|------|-----------------|
 | `.cursor-plugin/plugin.json` | Cursor Plugin manifest (this package) | [Cursor plugin schema](https://github.com/cursor/plugins/blob/main/schemas/plugin.schema.json) |
-| `skills/coderifts-api-governance/SKILL.md` | Agent skill | `coderifts-website/.well-known/agent-skills/coderifts-api-governance/SKILL.md` |
+| `skills/coderifts/SKILL.md` | Agent skill (`name: coderifts`) | Generated: coderifts-app `scripts/generate-skill-carriers.js`; vendored to `coderifts-website/.well-known/agent-skills/coderifts/SKILL.md` |
 | `rules/coderifts.mdc` | Cursor rule | **Generated** — `coderifts-app/scripts/generate-agent-host-files.js` → `generated/agent-host/.cursor/rules/coderifts.mdc` |
 | `mcp.json` | Cursor MCP wiring (`mcpServers`) | Same hosted endpoint as Claude `.mcp.json` (`https://app.coderifts.com/mcp`). **Not** the website tool-card `coderifts-website/mcp.json`. |
 | `hooks/hooks.json` | Cursor PreToolUse adapter | Existing CLI `coderifts claude-hook` (ID912 STRICT lives in that command; default remains soft) |

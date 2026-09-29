@@ -9,7 +9,7 @@ Exactly three tools: `preflight_change_set`, `verify_receipt`, `get_decision_det
 | Component | Path |
 |-----------|------|
 | Manifest | `.cursor-plugin/plugin.json` |
-| Skill | `skills/coderifts-api-governance/SKILL.md` |
+| Skill | `skills/coderifts/SKILL.md` (skill name `coderifts`; the plugin is `coderifts-api-governance`) |
 | Rule | `rules/coderifts.mdc` (generated; ID846) |
 | MCP | `mcp.json` → `https://app.coderifts.com/mcp` |
 | Hook | `hooks/hooks.json` → `npx coderifts claude-hook` (ID912) |

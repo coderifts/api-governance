@@ -1,6 +1,6 @@
 ---
 name: coderifts
-description: "Call preflight_change_set before merge, deploy, publish, or tool registration when a contract artifact changed (OpenAPI/Swagger, GraphQL, gRPC/protobuf, AsyncAPI, MCP manifest, or agent tool schemas). Send the complete base-to-head change set. Branch on execution_action only. If you already hold a chain receipt and only need authenticity/lifecycle: verify_receipt. If you need a past decision by id: get_decision_details. Neither replaces preflight for a new change set. Do not call CodeRifts tools for a documentation-only change with no contract artifact content change."
+description: "Governs API-contract changes before they ship. Use when about to merge, deploy, publish, or register/expose agent tools AND the change touches a contract artifact (OpenAPI/Swagger, GraphQL SDL, gRPC/protobuf, AsyncAPI, MCP manifest, or agent tool schemas): get a decision (ALLOW/WARN/REQUIRE_APPROVAL/BLOCK) with a risk score and a signed receipt, verify a receipt you already hold, or look up a past decision. Also use to tell 'the signature is valid' apart from 'this receipt authorizes THIS action right now'. Retrieval-first: fetch the current Decision Spec and schemas instead of relying on pre-trained knowledge."
 ---
 
 <!-- GENERATED from agent/skills/coderifts/SKILL.md — do not hand-edit. -->

@@ -168,15 +168,18 @@ if (mustExist(mcpPath, 'mcp.json exists')) {
 }
 
 // ── 3. Skill + tools ────────────────────────────────────────────────────────
-const skillPath = path.join(PKG, 'skills', 'coderifts-api-governance', 'SKILL.md');
+// 2026-09-29 — ONE SKILL, ONE NAME: the skill is `coderifts` in every carrier (the name skills.sh
+// indexes). `coderifts-api-governance` stays the Cursor PLUGIN name (PLUGIN_NAME), not the skill's.
+const SKILL_NAME = 'coderifts';
+const skillPath = path.join(PKG, 'skills', SKILL_NAME, 'SKILL.md');
 if (mustExist(skillPath, 'SKILL.md exists')) {
   const text = fs.readFileSync(skillPath, 'utf8');
   if (!text.startsWith('---\n')) fail('SKILL.md frontmatter', 'missing ---');
   else ok('SKILL.md has YAML frontmatter');
-  if (!/^name:\s*coderifts-api-governance\s*$/m.test(text)) {
-    fail('SKILL.md name', 'expected coderifts-api-governance');
+  if (!/^name:\s*coderifts\s*$/m.test(text)) {
+    fail('SKILL.md name', `expected ${SKILL_NAME}`);
   } else {
-    ok('SKILL.md name', PLUGIN_NAME);
+    ok('SKILL.md name', SKILL_NAME);
   }
   const missingTools = CANONICAL_TOOLS.filter((t) => !text.includes(t));
   if (missingTools.length) fail('SKILL.md tools', missingTools.join(', '));
@@ -229,7 +232,7 @@ if (mustExist(marketPath, '.cursor-plugin/marketplace.json exists')) {
 }
 
 // ── 7. Drift vs canonical sources (when checkouts exist) ────────────────────
-const websiteSkill = path.join(WEBSITE, '.well-known', 'agent-skills', 'coderifts-api-governance', 'SKILL.md');
+const websiteSkill = path.join(WEBSITE, '.well-known', 'agent-skills', SKILL_NAME, 'SKILL.md');
 if (fs.existsSync(websiteSkill) && fs.existsSync(skillPath)) {
   const a = fs.readFileSync(websiteSkill);
   const b = fs.readFileSync(skillPath);
