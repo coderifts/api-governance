@@ -202,11 +202,19 @@ if (mustExist(hooksPath, 'hooks/hooks.json exists')) {
   try {
     const hooks = readJson(hooksPath);
     const pre = (((hooks.hooks || {}).preToolUse) || [])[0];
-    if (!pre || typeof pre.command !== 'string' || !pre.command.includes('coderifts') || !pre.command.includes('claude-hook')) {
-      fail('hooks.json preToolUse', 'must invoke coderifts claude-hook');
+    // 2026-09-29 (plugins101): the Cursor hook is the CLI's Cursor adapter, on Cursor's tool names,
+    // fail-closed — the shape coderifts-app's agent-host generator already ships
+    // (src/cursor-hook-settings.js). Cursor's documented default is failClosed:false: a crashed or
+    // unreachable hook would ALLOW. `Edit` is not a Cursor tool; `Delete` is.
+    if (!pre || typeof pre.command !== 'string' || !/\bcoderifts cursor-hook$/.test(pre.command)) {
+      fail('hooks.json preToolUse', `must invoke coderifts cursor-hook, got ${pre && pre.command}`);
     } else {
-      ok('hooks.json preToolUse → coderifts claude-hook', pre.command);
+      ok('hooks.json preToolUse → coderifts cursor-hook', pre.command);
     }
+    if (!pre || pre.failClosed !== true) fail('hooks.json failClosed', `must be true, got ${pre && pre.failClosed}`);
+    else ok('hooks.json failClosed: true');
+    if (!pre || pre.matcher !== 'Write|Delete') fail('hooks.json matcher', `must be Write|Delete (Cursor tool names), got ${pre && pre.matcher}`);
+    else ok('hooks.json matcher Write|Delete');
   } catch (e) {
     fail('hooks.json parse', e.message);
   }

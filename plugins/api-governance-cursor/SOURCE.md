@@ -9,7 +9,7 @@ Do not hand-edit vendored generated files.
 | `skills/coderifts/SKILL.md` | Agent skill (`name: coderifts`) | Generated: coderifts-app `scripts/generate-skill-carriers.js`; vendored to `coderifts-website/.well-known/agent-skills/coderifts/SKILL.md` |
 | `rules/coderifts.mdc` | Cursor rule | **Generated** — `coderifts-app/scripts/generate-agent-host-files.js` → `generated/agent-host/.cursor/rules/coderifts.mdc` |
 | `mcp.json` | Cursor MCP wiring (`mcpServers`) | Same hosted endpoint as Claude `.mcp.json` (`https://app.coderifts.com/mcp`). **Not** the website tool-card `coderifts-website/mcp.json`. |
-| `hooks/hooks.json` | Cursor PreToolUse adapter | Existing CLI `coderifts claude-hook` (ID912 STRICT lives in that command; default remains soft) |
+| `hooks/hooks.json` | Cursor preToolUse adapter | CLI `coderifts cursor-hook` (`Write\|Delete`, `failClosed: true`) — the shape of coderifts-app `src/cursor-hook-settings.js`, with `npx --yes` because a plugin user has no global CLI |
 | `LICENSE` | SPDX MIT | Repo-root `LICENSE` (in-repo symlink) |
 | `assets/logo.png` | Marketplace logo | `plugins/api-governance-openai/assets/logo.png` (in-repo symlink) |
 

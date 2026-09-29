@@ -75,7 +75,7 @@ signed / fail-closed — not an AI compatibility scan.
 | `plugins/api-governance-cursor/skills/coderifts/SKILL.md` | Skill (`name: coderifts`) | **Generated** — coderifts-app `scripts/generate-skill-carriers.js`; the website `.well-known/agent-skills/coderifts/SKILL.md` is vendored from it |
 | `plugins/api-governance-cursor/rules/coderifts.mdc` | Cursor rule | **Generated** — `generate-agent-host-files.js` |
 | `plugins/api-governance-cursor/mcp.json` | Streamable HTTP MCP wiring | Same endpoint as Claude `.mcp.json` (not the website tool-card) |
-| `plugins/api-governance-cursor/hooks/hooks.json` | PreToolUse adapter | Existing CLI `coderifts claude-hook` (ID912) |
+| `plugins/api-governance-cursor/hooks/hooks.json` | preToolUse adapter, `failClosed: true` | CLI `coderifts cursor-hook` on `Write\|Delete` — same shape as the app's generated `.cursor/hooks.json` |
 | `.cursor-plugin/marketplace.json` | Cursor marketplace entry | Cursor `marketplace.schema.json` |
 
 Validate:

@@ -12,7 +12,7 @@ Exactly three tools: `preflight_change_set`, `verify_receipt`, `get_decision_det
 | Skill | `skills/coderifts/SKILL.md` (skill name `coderifts`; the plugin is `coderifts-api-governance`) |
 | Rule | `rules/coderifts.mdc` (generated; ID846) |
 | MCP | `mcp.json` → `https://app.coderifts.com/mcp` |
-| Hook | `hooks/hooks.json` → `npx coderifts claude-hook` (ID912) |
+| Hook | `hooks/hooks.json` → `npx --yes coderifts cursor-hook` on `Write\|Delete`, `failClosed: true` |
 
 Set `CODERIFTS_API_KEY` in Cursor (**Plugins → Configure**). Discovery works without a key; tool calls that require auth need the Bearer token.
 

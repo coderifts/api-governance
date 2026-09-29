@@ -3,9 +3,10 @@
   "hooks": {
     "preToolUse": [
       {
-        "command": "npx --yes coderifts claude-hook",
-        "matcher": "Write|Edit",
-        "failClosed": false
+        "command": "npx --yes coderifts cursor-hook",
+        "matcher": "Write|Delete",
+        "timeout": 60,
+        "failClosed": true
       }
     ]
   }
