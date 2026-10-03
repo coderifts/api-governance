@@ -1,7 +1,7 @@
 {
   "name": "api-governance",
-  "version": "1.2.2",
-  "description": "Signed, offline-verifiable authorization for AI-agent contract changes. Claude Code asks before a contract change proceeds; only a granted change can proceed. The verdict is deterministic — the same change set yields the same verdict, not a model's judgement — and branching is fail-closed: an unrecognised execution_action is not permission. Three MCP tools: preflight_change_set, verify_receipt, get_decision_details.",
+  "version": "1.2.3",
+  "description": "Stops an agent's breaking edit to an OpenAPI, GraphQL, protobuf, AsyncAPI or MCP contract until a signed grant exists. The required check on the pull request stays the merge gate.",
   "author": {
     "name": "CodeRifts",
     "email": "peter@coderifts.com"
@@ -27,5 +27,9 @@
     }
   },
   "icon": "./.claude-plugin/icon.png",
-  "privacyPolicyUrl": "https://coderifts.com/privacy/"
+  "privacyPolicyUrl": "https://coderifts.com/privacy/",
+  "displayName": "CodeRifts",
+  "supportUrl": "https://coderifts.com/trust-center/#who-to-mail",
+  "documentationUrl": "https://coderifts.com/install/",
+  "termsOfServiceUrl": "https://coderifts.com/terms/"
 }

@@ -36,7 +36,7 @@ const MERGE_GATE = 'The merge gate is the required CodeRifts check on the pull r
 export const DOES_NOT_PROVE = Object.freeze([
   'Installed as a mod, the user can approve the call with another mod, and disableAllHooks or --safe-mode turns it off.',
   'A managed mod is final for the tool calls it sees. A shell command that writes a contract file or reaches an API through Bash is covered only as far as the mod inspects Bash; the required check is the guarantee.',
-  'that the mod was running: a plugin can fail to load its mod without a message; /plugin shows "1 mod active" when it runs, and the required check is the guarantee',
+  'It does not prove that the mod was running: a plugin can fail to load its mod without a message; /plugin shows "1 mod active" when it runs, and the required check is the guarantee.',
 ]);
 
 // This turn's decisions, for the band: { refused, allowed, last, lastRefused }. Reset by turn.start.
