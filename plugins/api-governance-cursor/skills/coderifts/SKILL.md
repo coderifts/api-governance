@@ -7,22 +7,6 @@ description: Before merging or shipping a change to an API or tool contract, pre
 
 # CodeRifts contract governance
 
-<!--
-CANONICAL AUTHORING SOURCE (DECISIONS.md: canonical_skill_source). The packages under
-generated/ and dist/ are OUTPUTS and are not authoring sources; edit this file, not those.
-
-⚠ The description above carries NO colon, and that is load-bearing rather than stylistic. The
-host that reads this frontmatter models its parser as /^([A-Za-z0-9_-]+):\s*(.*)$/ — it captures
-the rest of the line RAW and never strips quotes. A colon inside the value is therefore invalid
-as a plain YAML scalar, and QUOTING it is not the fix: the quotes would reach that host as part
-of the text. A comma is the form that satisfies strict YAML and the host parser at once.
-
-ONE SKILL, ONE NAME (2026-09-29). This body is the ONLY body: the Claude package, the Cursor and the
-Codex/OpenAI plugin carriers and the website's .well-known copy all carry it byte for byte; only the
-frontmatter may differ per host (scripts/generate-skill-carriers.js). It is the union of what the
-three hand-kept carriers said — nothing a carrier published was dropped.
--->
-
 Before quoting field names, enums, thresholds, or response shapes, retrieve the current contract from
 the [Decision Spec](https://coderifts.com/decision-spec/) and the
 [decision-result consumer schema](https://coderifts.com/schemas/decision-result.v1.consumer.json).
