@@ -9,8 +9,13 @@
 // Its own deadline (8 s, inside the 10 s a hook has) and its .catch both REFUSE: an error, a
 // timeout or an answer it cannot read never lets the edit through.
 //
-// ui.render (AbovePrompt): one band with the last decision and the receipt digest, on the
-// terminal and the Desktop app. Where neither draws, the same line goes to the transcript.
+// ui.render (AbovePrompt): one band with this turn's decisions and the receipt digest, on the
+// terminal and the Desktop app. Where neither draws, each decision is one transcript line.
+//
+// 1.2.1 (2026-10-03): a refusal holds the band for the rest of its turn. Measured on 1.2.0: Claude
+// sent two Edits of one file in one turn; the mod refused the breaking one (STOP) and allowed the
+// other (an example value, CONTINUE), and the band showed only the last one — "✓ CONTINUE" over a
+// refused change. Now the band leads with the refusal and counts both.
 //
 // What this mod does not prove, and what it leaves to the required check, is in README.md
 // ("What this mod does not prove") and in the does_not_prove list below, word for word.
@@ -28,8 +33,12 @@ export const DOES_NOT_PROVE = Object.freeze([
   'A managed mod is final for the tool calls it sees. A shell command that writes a contract file or reaches an API through Bash is covered only as far as the mod inspects Bash; the required check is the guarantee.',
 ]);
 
-// The last decision, for the band. null until the first contract call.
-let last = null;
+// This turn's decisions, for the band: { refused, allowed, last, lastRefused }. Reset by turn.start.
+let turn = emptyTurn();
+
+function emptyTurn() {
+  return { refused: 0, allowed: 0, last: null, lastRefused: null };
+}
 
 export function register(on) {
   on('tool.call', { tool: ['Write', 'Edit', 'MultiEdit'] }, async ($, e, next) => {
@@ -77,18 +86,26 @@ export function register(on) {
       : `CodeRifts did not check this ${e.tool} (${next.error.kind}: ${String(next.error.message).slice(0, 120)}), so it was refused. Retry the edit; ${MERGE_GATE}`,
   }));
 
+  on('turn.start', ($, e, next) => {
+    turn = emptyTurn();
+    $.ui.invalidate('ui.render');
+    return next(e);
+  });
+
   on('ui.render', { component: 'AbovePrompt' }, ($, e, next) => {
-    if (last === null) {
+    if (turn.last === null) {
       return next(e);
     }
     const { Box, Text } = $.ui.resolve(e);
-    const color = last.refused ? 'red' : 'green';
+    const shown = turn.lastRefused ?? turn.last;
+    const counts = turn.refused + turn.allowed > 1 ? ` · ${turn.refused} refused, ${turn.allowed} allowed this turn` : '';
     return Box({
       flexDirection: 'row',
       children: [
-        Text({ key: 'mark', color, bold: true, children: last.refused ? '✗ CodeRifts ' : '✓ CodeRifts ' }),
-        Text({ key: 'line', children: `${last.label} · ${last.rel}`, wrap: 'truncate-end' }),
-        last.digest ? Text({ key: 'digest', dimColor: true, children: ` · receipt ${shortDigest(last.digest)}` }) : null,
+        Text({ key: 'mark', color: shown.refused ? 'red' : 'green', bold: true, children: shown.refused ? '✗ CodeRifts ' : '✓ CodeRifts ' }),
+        Text({ key: 'line', children: `${shown.label} · ${shown.rel}`, wrap: 'truncate-end' }),
+        shown.digest ? Text({ key: 'digest', dimColor: true, children: ` · receipt ${shortDigest(shown.digest)}` }) : null,
+        counts ? Text({ key: 'counts', dimColor: true, children: counts }) : null,
       ],
     });
   });
@@ -139,7 +156,13 @@ async function refuse($, rel, why, digest, label = 'refused') {
 
 /** The band where the terminal or the Desktop app draws, one transcript line everywhere else. */
 async function show($, line, state) {
-  last = { refused: false, ...state };
+  const decision = { refused: false, ...state };
+  turn = {
+    refused: turn.refused + (decision.refused ? 1 : 0),
+    allowed: turn.allowed + (decision.refused ? 0 : 1),
+    last: decision,
+    lastRefused: decision.refused ? decision : turn.lastRefused,
+  };
   const surfaces = await $.session.surfaces();
   if (surfaces.includes('terminal') || surfaces.includes('desktop')) {
     $.ui.invalidate('ui.render');
