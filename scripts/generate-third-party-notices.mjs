@@ -188,8 +188,32 @@ if (!tree) {
   process.exit(0);
 }
 
+/**
+ * 2026-10-03 — BINARIES FETCHED OUTSIDE THE PACKAGE MANAGER. coderifts-app downloads the oasdiff
+ * binary at install and at start (scripts/install-oasdiff.js); no manifest the npm walk reads names
+ * it, so this file said "nothing in this repository does that" while it did. A repository that
+ * fetches a binary declares it in third-party-binaries.json; the version is READ from the script that
+ * fetches it (version_from: file + pattern), never typed twice. A declaration whose pattern does not
+ * match is a failure, not an omission.
+ */
+const BINARIES_FILE = 'third-party-binaries.json';
+function binariesOf(repo) {
+  const p = join(repo, BINARIES_FILE);
+  if (!existsSync(p)) return [];
+  return JSON.parse(readFileSync(p, 'utf8')).map((b) => {
+    const src = readFileSync(join(repo, b.version_from.file), 'utf8');
+    const m = new RegExp(b.version_from.pattern).exec(src);
+    if (!m) throw new Error(`${BINARIES_FILE}: ${b.name}: version pattern does not match ${b.version_from.file}`);
+    const version = m[1];
+    return { name: b.name, version, license: b.license, license_source: String(b.license_source || '').replace('{version}', version),
+      source: b.source, fetched_by: b.fetched_by, ships_when: b.ships_when };
+  });
+}
+const binaries = binariesOf(REPO);
+const binariesDigest = `sha256:${createHash('sha256').update(JSON.stringify(binaries.map((b) => [b.name, b.version, b.license]))).digest('hex')}`;
+
 const thirdParty = tree.packages.filter((p) => !p.first_party);
-const stop = thirdParty.filter((p) => p.license && STOP_CLASS.test(p.license));
+const stop = [...thirdParty, ...binaries].filter((p) => p.license && STOP_CLASS.test(p.license));
 const note = thirdParty.filter((p) => p.license && NOTE_CLASS.test(p.license));
 const unresolved = thirdParty.filter((p) => p.unresolved);
 const firstParty = tree.packages.filter((p) => p.first_party);
@@ -202,7 +226,9 @@ const result = {
   dev_only_count: tree.dev_only.length,
   first_party_excluded: firstParty.map((p) => p.name),
   third_party: thirdParty,
-  needs_notices: thirdParty.length > 0,
+  binaries,
+  binaries_digest: binaries.length ? binariesDigest : null,
+  needs_notices: thirdParty.length > 0 || binaries.length > 0,
   stop_class: stop.map((p) => `${p.name} (${p.license})`),
   note_class: note.map((p) => `${p.name} (${p.license})`),
   unresolved: unresolved.map((p) => `${p.name}: ${p.unresolved}`),
@@ -229,6 +255,7 @@ const lines = [
   // a dependency ADDED, REMOVED or VERSION-BUMPED makes this file red — not merely touching it, and
   // not the passage of time. A date would have said when it was written; this says what it describes.
   `<!-- manifest-digest: sha256:${createHash('sha256').update(readFileSync(join(REPO, tree.manifest), 'utf8')).digest('hex')} -->`,
+  ...(binaries.length ? [`<!-- binaries-digest: ${binariesDigest} -->`] : []),
   '',
   `This package ships the third-party code listed below. Resolved from \`${tree.manifest}\` on `
   + `${new Date().toISOString().slice(0, 10)}; each licence is read from that package's own metadata, `
@@ -241,6 +268,13 @@ const lines = [
   '|---|---|---|---|',
   ...thirdParty.map((p) => `| \`${p.name}\` | ${p.version ?? '—'} | ${p.license ?? `**UNRESOLVED** — ${p.unresolved}`} | ${p.marker ? `\`${p.marker}\`` : 'always'} |`),
   '',
+  ...(binaries.length ? [
+    '## Binaries fetched at install', '',
+    `Not npm packages: downloaded by the scripts named below. Declared in \`${BINARIES_FILE}\`; the version is read from the fetching script.`, '',
+    '| Binary | Version | Licence | Source | Fetched by | Ships when |',
+    '|---|---|---|---|---|---|',
+    ...binaries.map((b) => `| \`${b.name}\` | ${b.version} | ${b.license} ([licence](${b.license_source})) | ${b.source} | \`${b.fetched_by}\` | ${b.ships_when} |`),
+    ''] : []),
   ...(stop.length ? [
     '## ⚠ STOP — copyleft-class licence present', '',
     'The following require a decision before this package ships:', '',
@@ -256,8 +290,13 @@ const lines = [
   '- It does not reproduce the licence texts. It names the package, version and licence so each can be',
   '  fetched from its own source of truth; a pasted copy is one more thing that goes stale.',
   '- It does not cover development dependencies, which do not ship.',
-  '- It is generated from the declared runtime closure. A dependency pulled in at runtime by other',
-  '  means would not appear here, and nothing in this repository does that.',
+  ...(binaries.length ? [
+    '- It is generated from the declared runtime closure and the binaries declared in',
+    `  \`${BINARIES_FILE}\`. A dependency pulled in at runtime by other means would not appear here.`,
+  ] : [
+    '- It is generated from the declared runtime closure. A dependency pulled in at runtime by other',
+    '  means would not appear here, and nothing in this repository does that.',
+  ]),
   '- The **Ships when** column carries the environment marker verbatim where there is one. A marked',
   '  package still ships wherever its condition holds — only `extra ==` requirements are optional,',
   '  and those are excluded.',

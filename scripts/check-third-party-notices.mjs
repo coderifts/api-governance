@@ -128,7 +128,17 @@ function checkRepo(repo) {
         + `manifest is ${wantDigest.slice(0, 23)}…). A dependency was added, removed or bumped and the `
         + 'notices did not follow. Re-generate it.');
     }
-    for (const p of doc.third_party) {
+    // 2026-10-03 — binaries fetched at install: their own digest, so a version bump in the fetching
+    // script makes the file red exactly like a dependency bump in the manifest.
+    if (doc.binaries_digest) {
+      const b = /<!--\s*binaries-digest:\s*(sha256:[0-9a-f]{64})\s*-->/.exec(body);
+      if (!b || b[1] !== doc.binaries_digest) {
+        fail('NOTICES_STALE',
+          `the binaries declared in third-party-binaries.json (${(doc.binaries || []).map((x) => `${x.name}@${x.version}`).join(', ')}) `
+          + `are not the ones ${NOTICES} was generated for. Re-generate it.`);
+      }
+    }
+    for (const p of [...doc.third_party, ...(doc.binaries || [])]) {
       if (!body.includes(`\`${p.name}\``)) {
         fail('NOTICES_INCOMPLETE',
           `${p.name} ships and is not named in ${NOTICES}.`);
@@ -137,7 +147,7 @@ function checkRepo(repo) {
   }
 
   // ── RULE COPYLEFT_STOP ──
-  for (const p of doc.third_party) {
+  for (const p of [...doc.third_party, ...(doc.binaries || [])]) {
     if (p.license && STOP_CLASS.test(p.license)) {
       fail('COPYLEFT_STOP',
         `${p.name}@${p.version ?? '?'} is ${p.license}. This is a decision, not a finding to triage `
