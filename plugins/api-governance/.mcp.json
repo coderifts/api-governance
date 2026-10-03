@@ -1,10 +1,10 @@
 {
   "mcpServers": {
     "coderifts": {
-      "type": "http",
+      "type": "streamable-http",
       "url": "https://app.coderifts.com/mcp",
       "headers": {
-        "Authorization": "Bearer ${CODERIFTS_API_KEY}"
+        "Authorization": "Bearer ${user_config.api_key}"
       }
     }
   }

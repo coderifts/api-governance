@@ -3,9 +3,10 @@
 // tool.call (Write / Edit / MultiEdit): when the call touches a contract file (named in
 // .coderifts.yml `schema:`, or matching the contract patterns), it sends the before/after text to
 // CodeRifts preflight and holds the call until the answer is in:
-//   authorize (CODERIFTS_API_KEY set)  CONTINUE / CONTINUE_WITH_MONITORING → next(e); anything else
-//                                      refuses the call
-//   analyze   (no key)                 NO_BREAK_DETECTED → next(e); anything else refuses the call
+//   authorize (the api_key option set)  CONTINUE / CONTINUE_WITH_MONITORING → next(e); anything else
+//                                       refuses the call
+//   analyze   (no key)                  NO_BREAK_DETECTED → next(e); anything else refuses the call
+// It contacts one address, https://app.coderifts.com/api/v1/preflight, written at the call.
 // Its own deadline (8 s, inside the 10 s a hook has) and its .catch both REFUSE: an error, a
 // timeout or an answer it cannot read never lets the edit through.
 //
@@ -17,12 +18,16 @@
 // other (an example value, CONTINUE), and the band showed only the last one — "✓ CONTINUE" over a
 // refused change. Now the band leads with the refusal and counts both.
 //
+// 1.2.2 (2026-10-03, the Claude directory review): the key is the plugin's `api_key` option
+// (userConfig, sensitive), read from register's second parameter — no environment variable is read
+// any more, and the address is a fixed literal. The band and the transcript line carry the
+// decision_id, so the receipt this mod saw can be fetched (get_decision_details) and verified.
+//
 // What this mod does not prove, and what it leaves to the required check, is in README.md
 // ("What this mod does not prove") and in the does_not_prove list below, word for word.
 //
 // Generated into the plugin by scripts/generate-claude-package.js. Edit this file, not the copy.
 
-const API_BASE = 'https://app.coderifts.com';
 const DEADLINE_MS = 8000;
 const TIMED_OUT = Object.freeze({ timedOut: true });
 const ALLOW_ACTIONS = Object.freeze(['CONTINUE', 'CONTINUE_WITH_MONITORING']);
@@ -31,6 +36,7 @@ const MERGE_GATE = 'The merge gate is the required CodeRifts check on the pull r
 export const DOES_NOT_PROVE = Object.freeze([
   'Installed as a mod, the user can approve the call with another mod, and disableAllHooks or --safe-mode turns it off.',
   'A managed mod is final for the tool calls it sees. A shell command that writes a contract file or reaches an API through Bash is covered only as far as the mod inspects Bash; the required check is the guarantee.',
+  'that the mod was running: a plugin can fail to load its mod without a message; /plugin shows "1 mod active" when it runs, and the required check is the guarantee',
 ]);
 
 // This turn's decisions, for the band: { refused, allowed, last, lastRefused }. Reset by turn.start.
@@ -40,7 +46,11 @@ function emptyTurn() {
   return { refused: 0, allowed: 0, last: null, lastRefused: null };
 }
 
-export function register(on) {
+export function register(on, options) {
+  // The plugin's `api_key` option (userConfig, sensitive): stored by Claude Code in secure storage
+  // and handed here. No key → analyze, which authorizes nothing.
+  const key = options && typeof options.api_key === 'string' && options.api_key.trim() !== '' ? options.api_key.trim() : null;
+
   on('tool.call', { tool: ['Write', 'Edit', 'MultiEdit'] }, async ($, e, next) => {
     const cwd = await $.session.cwd();
     const filePath = String(e.file_path ?? '');
@@ -56,18 +66,17 @@ export function register(on) {
       return refuse($, rel, 'the edit could not be applied to the file as it is on disk, so there is no after text to check', null);
     }
 
-    const key = await $.env.get('CODERIFTS_API_KEY');
-    const base = String((await $.env.get('CODERIFTS_API_BASE')) || API_BASE).replace(/\/$/, '');
     const mode = key ? 'authorize' : 'analyze';
-    const body = {
-      preflight_mode: mode,
-      artifacts: [{ id: 'api', type: artifactType(rel), before, after }],
-      ...(mode === 'authorize' ? { context: { operation: 'merge', environment: 'staging' } } : {}),
-    };
-    const headers = { 'content-type': 'application/json', accept: 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) };
+    const artifact = { id: 'api', type: artifactType(rel), before, after };
 
     const answer = await Promise.race([
-      $.http.fetch(`${base}/api/v1/preflight`, { method: 'POST', headers, body: JSON.stringify(body) }),
+      $.http.fetch('https://app.coderifts.com/api/v1/preflight', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) },
+        body: JSON.stringify(key
+          ? { preflight_mode: 'authorize', artifacts: [artifact], context: { operation: 'merge', environment: 'staging' } }
+          : { preflight_mode: 'analyze', artifacts: [artifact] }),
+      }),
       $.clock.sleep(DEADLINE_MS).then(() => TIMED_OUT),
     ]);
     if (answer === TIMED_OUT) {
@@ -76,9 +85,9 @@ export function register(on) {
     const verdict = readVerdict(mode, answer);
     const digest = await receiptDigest(verdict.receipt);
     if (!verdict.allow) {
-      return refuse($, rel, verdict.why, digest, verdict.label);
+      return refuse($, rel, verdict.why, digest, verdict.label, verdict.decisionId);
     }
-    await show($, `CodeRifts · ${verdict.label} · ${rel}${digest ? ` · receipt ${shortDigest(digest)}` : ''}`, { label: verdict.label, digest, rel });
+    await show($, `CodeRifts · ${verdict.label} · ${rel}${trail(digest, verdict.decisionId)}`, { label: verdict.label, digest, rel, decisionId: verdict.decisionId });
     return next(e);
   }).catch(($, e, next) => ({
     deny: next.called
@@ -104,7 +113,7 @@ export function register(on) {
       children: [
         Text({ key: 'mark', color: shown.refused ? 'red' : 'green', bold: true, children: shown.refused ? '✗ CodeRifts ' : '✓ CodeRifts ' }),
         Text({ key: 'line', children: `${shown.label} · ${shown.rel}`, wrap: 'truncate-end' }),
-        shown.digest ? Text({ key: 'digest', dimColor: true, children: ` · receipt ${shortDigest(shown.digest)}` }) : null,
+        shown.digest || shown.decisionId ? Text({ key: 'digest', dimColor: true, children: trail(shown.digest, shown.decisionId) }) : null,
         counts ? Text({ key: 'counts', dimColor: true, children: counts }) : null,
       ],
     });
@@ -135,10 +144,11 @@ export function readVerdict(mode, answer) {
   }
   const action = dr.execution_action || (doc && doc.execution_action) || null;
   const receipt = dr.receipt && typeof dr.receipt.token === 'string' ? dr.receipt.token : null;
+  const decisionId = typeof dr.decision_id === 'string' && dr.decision_id !== '' ? dr.decision_id : null;
   if (ALLOW_ACTIONS.includes(action)) {
-    return { allow: true, label: action, receipt };
+    return { allow: true, label: action, receipt, decisionId };
   }
-  return { allow: false, label: action || 'no execution_action', receipt, why: `CodeRifts decided ${action || 'nothing it names'}${breaks ? `: the change ${breaks}` : ''}` };
+  return { allow: false, label: action || 'no execution_action', receipt, decisionId, why: `CodeRifts decided ${action || 'nothing it names'}${breaks ? `: the change ${breaks}` : ''}` };
 }
 
 /** "breaks 2 things: path.remove /a, …" or ''. */
@@ -149,8 +159,8 @@ function breakSummary(doc) {
   return `breaks ${list.length} ${list.length === 1 ? 'thing' : 'things'}: ${named}${list.length > 3 ? ', …' : ''}`;
 }
 
-async function refuse($, rel, why, digest, label = 'refused') {
-  await show($, `CodeRifts refused · ${rel} · ${why}${digest ? ` · receipt ${shortDigest(digest)}` : ''}`, { label, digest, rel, refused: true });
+async function refuse($, rel, why, digest, label = 'refused', decisionId = null) {
+  await show($, `CodeRifts refused · ${rel} · ${why}${trail(digest, decisionId)}`, { label, digest, rel, refused: true, decisionId });
   return { deny: `CodeRifts refused this edit of ${rel}: ${why}. Next step: change the contract so it does not break its consumers, or get the change authorized (coderifts.preflight_change_set with preflight_mode=authorize). ${MERGE_GATE}` };
 }
 
@@ -256,6 +266,11 @@ async function receiptDigest(token) {
   if (!token) return null;
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
   return `sha256:${[...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** " · decision dec_… · receipt sha256:…" — the id fetches the receipt, the digest identifies it. */
+function trail(digest, decisionId) {
+  return `${decisionId ? ` · decision ${decisionId}` : ''}${digest ? ` · receipt ${shortDigest(digest)}` : ''}`;
 }
 
 function shortDigest(d) {
