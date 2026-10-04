@@ -80,7 +80,9 @@ export function register(on, options) {
     const answer = await Promise.race([
       $.http.fetch('https://app.coderifts.com/api/v1/preflight', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', accept: 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) },
+        // 1.2.5: the acquisition channel the server already counts (source_id `claude_marketplace`);
+        // attribution only — it never reaches a decision. Named in the README's "what it sends".
+        headers: { 'content-type': 'application/json', accept: 'application/json', 'x-coderifts-source': 'claude_marketplace', ...(key ? { authorization: `Bearer ${key}` } : {}) },
         body: JSON.stringify(key
           ? { preflight_mode: 'authorize', artifacts: [artifact], context: { operation: 'merge', environment: 'staging' } }
           : { preflight_mode: 'analyze', artifacts: [artifact] }),
