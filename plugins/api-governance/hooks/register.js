@@ -26,17 +26,33 @@
 // What this mod does not prove, and what it leaves to the required check, is in README.md
 // ("What this mod does not prove") and in the does_not_prove list below, word for word.
 //
+// 2026-10-03 (CC-2 T2): which call touches a contract file is decided by contract-write.mjs, the
+// one decision function agent-hooks and `coderifts claude-hook` run too (a copy of
+// @coderifts/contract-path's, written by scripts/generate-contract-write-copies.js). With it the
+// mod reads Bash: a shell command that writes a named contract file is refused, with a pointer to
+// Write/Edit; one that can reach a directory holding a contract without naming it asks (tool.check).
+//
 // Generated into the plugin by scripts/generate-claude-package.js. Edit this file, not the copy.
+
+import { afterText, decideToolCall } from './contract-write.mjs';
 
 const DEADLINE_MS = 8000;
 const TIMED_OUT = Object.freeze({ timedOut: true });
 const ALLOW_ACTIONS = Object.freeze(['CONTINUE', 'CONTINUE_WITH_MONITORING']);
 const MERGE_GATE = 'The merge gate is the required CodeRifts check on the pull request.';
 
+// GOVERNANCE_UNAVAILABLE (2026-10-04): the one sentence the App, the CLI hook and agent-hooks write
+// verbatim when CodeRifts could not decide. The call is still refused; the sentence says why.
+function governanceUnavailable(why) {
+  return `GOVERNANCE_UNAVAILABLE: CodeRifts could not decide (${why}); this is not a finding about your change.`;
+}
+
 export const DOES_NOT_PROVE = Object.freeze([
-  'Installed as a mod, the user can approve the call with another mod, and disableAllHooks or --safe-mode turns it off.',
-  'A managed mod is final for the tool calls it sees. A shell command that writes a contract file or reaches an API through Bash is covered only as far as the mod inspects Bash; the required check is the guarantee.',
+  'Installed as a mod, it is one of the mods the user installed: a mod that runs before it can answer or rewrite the call, or what this mod reads, so it never sees the change; disableAllHooks in any settings file (the .claude/settings.json of the project included), --safe-mode or --bare turns it off.',
+  'Only an organization mod (installed in place from a marketplace directory the administrator owns, and enabled in managed settings) runs before the mods users install and keeps its refusal for the calls it sees; installed from its GitHub marketplace this plugin never counts as one, and --safe-mode or three crashes of the hooks worker unload even that.',
+  'Bash is read from the command text: a shell write to a named contract file is refused, and one that can reach a directory holding a contract without naming it asks; a command shape it does not recognise passes, and the required check is the guarantee.',
   'It does not prove that the mod was running: a plugin can fail to load its mod without a message; /plugin shows "1 mod active" when it runs, and the required check is the guarantee.',
+  'A contract generated from source code — annotations, decorators, a build step — changes when the source changes; the hooks see the source edit, not the contract; the required check sees the generated contract.',
 ]);
 
 // This turn's decisions, for the band: { refused, allowed, last, lastRefused }. Reset by turn.start.
@@ -51,23 +67,15 @@ export function register(on, options) {
   // and handed here. No key → analyze, which authorizes nothing.
   const key = options && typeof options.api_key === 'string' && options.api_key.trim() !== '' ? options.api_key.trim() : null;
 
-  on('tool.call', { tool: ['Write', 'Edit', 'MultiEdit'] }, async ($, e, next) => {
-    const cwd = await $.session.cwd();
-    const filePath = String(e.file_path ?? '');
-    const rel = relativeTo(cwd, filePath);
-    const named = parseSchemaList(await readOrNull($, joinPath(cwd, '.coderifts.yml')));
-    if (!named.includes(rel) && !looksLikeContractPath(rel)) {
-      return next(e);
-    }
-
-    const before = (await readOrNull($, filePath)) ?? '';
-    const after = applyCall(e, before);
-    if (after === null) {
-      return refuse($, rel, 'the edit could not be applied to the file as it is on disk, so there is no after text to check', null);
-    }
+  on('tool.call', { tool: ['Write', 'Edit', 'MultiEdit', 'Bash'] }, async ($, e, next) => {
+    const d = await decideToolCall({ tool: e.tool, input: e }, await modIo($));
+    if (d.action === 'pass' || d.action === 'ask') return next(e); // an ask is put in tool.check, below
+    if (e.tool === 'Bash') return refuseShell($, d);
+    if (d.action === 'refuse') return refuse($, d.rel, d.why, null);
+    const { rel } = d;
 
     const mode = key ? 'authorize' : 'analyze';
-    const artifact = { id: 'api', type: artifactType(rel), before, after };
+    const artifact = { id: 'api', type: d.type, before: d.before, after: d.after };
 
     const answer = await Promise.race([
       $.http.fetch('https://app.coderifts.com/api/v1/preflight', {
@@ -80,9 +88,10 @@ export function register(on, options) {
       $.clock.sleep(DEADLINE_MS).then(() => TIMED_OUT),
     ]);
     if (answer === TIMED_OUT) {
-      return refuse($, rel, `CodeRifts did not answer within ${DEADLINE_MS / 1000} s`, null);
+      return refuseUnavailable($, rel, `CodeRifts did not answer within ${DEADLINE_MS / 1000} s`);
     }
     const verdict = readVerdict(mode, answer);
+    if (verdict.unavailable) return refuseUnavailable($, rel, verdict.why);
     const digest = await receiptDigest(verdict.receipt);
     if (!verdict.allow) {
       return refuse($, rel, verdict.why, digest, verdict.label, verdict.decisionId);
@@ -92,7 +101,22 @@ export function register(on, options) {
   }).catch(($, e, next) => ({
     deny: next.called
       ? `CodeRifts mod failed after the ${e.tool} call ran (${next.error.kind}); treat the change as unchecked. ${MERGE_GATE}`
-      : `CodeRifts did not check this ${e.tool} (${next.error.kind}: ${String(next.error.message).slice(0, 120)}), so it was refused. Retry the edit; ${MERGE_GATE}`,
+      : `CodeRifts did not check this ${e.tool} (${next.error.kind}: ${String(next.error.message).slice(0, 120)}), so it was refused. ${governanceUnavailable(`the check failed: ${next.error.kind}`)} Retry the edit; ${MERGE_GATE}`,
+  }));
+
+  // A shell write that can reach a contract without naming it is put to the user: tool.check is
+  // where a mod asks. A deny from the rules or another hook stands.
+  on('tool.check', { tool: 'Bash' }, async ($, e, next) => {
+    const decided = await next(e);
+    if ((typeof decided === 'string' ? decided : decided && decided.decision) === 'deny') return decided;
+    const d = await decideToolCall({ tool: 'Bash', input: e.input || {} }, await modIo($));
+    if (d.action !== 'ask') return decided;
+    await show($, `CodeRifts asks · ${d.scopes.join(', ')} · ${d.why}`, { label: 'ask', digest: null, rel: d.scopes.join(', '), refused: true, decisionId: null });
+    return { decision: 'ask', reason: `CodeRifts: ${d.why}. ${MERGE_GATE}` };
+  }).catch(($, e, next) => ({
+    // A failed check is not a pass: the user is asked (tool.call fails closed the same way).
+    decision: 'ask',
+    reason: `CodeRifts could not check this Bash command. ${governanceUnavailable(`the check failed: ${next.error.kind}`)} ${MERGE_GATE}`,
   }));
 
   on('turn.start', ($, e, next) => {
@@ -128,11 +152,13 @@ export function readVerdict(mode, answer) {
   try {
     doc = JSON.parse(answer.text);
   } catch {
-    return { allow: false, label: `HTTP ${answer.status}`, why: `CodeRifts answered HTTP ${answer.status} with no readable decision` };
+    return { allow: false, unavailable: true, label: `HTTP ${answer.status}`, why: `CodeRifts answered HTTP ${answer.status} with no readable decision` };
   }
   if (!answer.ok) {
     const msg = doc && (doc.message || doc.error);
-    return { allow: false, label: `HTTP ${answer.status}`, why: `CodeRifts answered HTTP ${answer.status}${msg ? ` (${String(msg).slice(0, 160)})` : ''}` };
+    // A server fault, a timeout or a rate limit is CodeRifts not deciding; a 4xx about the request is an answer.
+    const notDeciding = answer.status >= 500 || answer.status === 408 || answer.status === 429;
+    return { allow: false, unavailable: notDeciding, label: `HTTP ${answer.status}`, why: `CodeRifts answered HTTP ${answer.status}${msg ? ` (${String(msg).slice(0, 160)})` : ''}` };
   }
   const dr = doc && typeof doc.decision_result === 'object' && doc.decision_result !== null ? doc.decision_result : {};
   const breaks = breakSummary(doc);
@@ -157,6 +183,11 @@ function breakSummary(doc) {
   if (list.length === 0) return '';
   const named = list.slice(0, 3).map((b) => `${b.type || 'change'} ${b.path || ''}`.trim()).join(', ');
   return `breaks ${list.length} ${list.length === 1 ? 'thing' : 'things'}: ${named}${list.length > 3 ? ', …' : ''}`;
+}
+
+async function refuseUnavailable($, rel, why) {
+  await show($, `CodeRifts could not decide · ${rel} · ${why}`, { label: 'GOVERNANCE_UNAVAILABLE', digest: null, rel, refused: true, decisionId: null });
+  return { deny: `CodeRifts refused this edit of ${rel}. ${governanceUnavailable(why)} Retry the edit; ${MERGE_GATE}` };
 }
 
 async function refuse($, rel, why, digest, label = 'refused', decisionId = null) {
@@ -192,41 +223,39 @@ async function readOrNull($, path) {
   }
 }
 
-/** The file's text after this call, or null when the call does not apply to `before`. */
+/** The file's text after this call, or null when the call does not apply to `before` (contract-write's afterText). */
 export function applyCall(e, before) {
-  if (e.tool === 'Write') return String(e.content ?? '');
-  const edits = e.tool === 'MultiEdit' ? (Array.isArray(e.edits) ? e.edits : []) : [e];
-  let text = before;
-  for (const edit of edits) {
-    const from = String(edit.old_string ?? '');
-    const to = String(edit.new_string ?? '');
-    if (from === '') {
-      if (text !== '') return null;
-      text = to;
-    } else if (!text.includes(from)) {
-      return null;
-    } else {
-      text = edit.replace_all ? text.split(from).join(to) : text.replace(from, () => to);
-    }
-  }
-  return text;
+  return afterText(e.tool, e, before);
 }
 
-/** Mirrors the plugin's early guard and @coderifts/contract-path looksLikeContractPath. */
-export function looksLikeContractPath(p) {
-  const s = String(p || '').toLowerCase();
-  if (s.includes('node_modules/') || s.includes('vendor/')) return false;
-  return /\.(ya?ml|json|graphql|gql|proto)$/.test(s) && (s.includes('openapi') || s.includes('swagger') || s.includes('asyncapi')
-    || s.endsWith('.graphql') || s.endsWith('.gql') || s.endsWith('.proto') || s.includes('mcp'));
+/**
+ * What contract-write reads through the mods API: the file (missing → null; there but unreadable →
+ * a throw, which refuses), one directory level for its walk, and the project's `.coderifts.yml`
+ * schema list. No environment variable is read. Each of these is an event an earlier mod can rewrite.
+ */
+async function modIo($) {
+  const cwd = await $.session.cwd();
+  return {
+    cwd,
+    named: parseSchemaList(await readOrNull($, joinPath(cwd, '.coderifts.yml'))),
+    readFile: async (p) => ((await $.fs.exists(p)) ? $.fs.read(p) : null),
+    listDir: async (dir) => {
+      try {
+        const entries = await $.fs.list(dir === '.' ? cwd : joinPath(cwd, dir));
+        // $.fs.list names a directory 'dir' (measured on 2.1.288) and throws on a file.
+        return Array.isArray(entries) ? entries.map((x) => ({ name: x.name, kind: x.kind === 'dir' || x.kind === 'directory' ? 'directory' : 'file' })) : null;
+      } catch {
+        return null;
+      }
+    },
+  };
 }
 
-export function artifactType(p) {
-  const s = String(p).toLowerCase();
-  if (s.endsWith('.graphql') || s.endsWith('.gql')) return 'graphql';
-  if (s.endsWith('.proto')) return 'grpc';
-  if (s.includes('asyncapi')) return 'asyncapi';
-  if (s.includes('mcp')) return 'mcp_manifest';
-  return 'openapi';
+/** A shell command that writes a named contract file: refused, with the way that is checked. */
+async function refuseShell($, d) {
+  const names = (d.paths || []).map((x) => x.path).join(', ') || d.rel || 'a contract file';
+  await show($, `CodeRifts refused · ${names} · shell write`, { label: 'refused', digest: null, rel: names, refused: true, decisionId: null });
+  return { deny: `CodeRifts refused this shell command: ${d.why}. ${MERGE_GATE}` };
 }
 
 /** The `schema:` list of a .coderifts.yml, block or flow form. Nothing else is read. */
@@ -253,11 +282,6 @@ export function parseSchemaList(yml) {
 
 function joinPath(dir, name) {
   return `${String(dir).replace(/\/$/, '')}/${name}`;
-}
-
-function relativeTo(cwd, filePath) {
-  const root = `${String(cwd).replace(/\/$/, '')}/`;
-  return filePath.startsWith(root) ? filePath.slice(root.length) : filePath.replace(/^\.\//, '');
 }
 
 // ---- the receipt -----------------------------------------------------------

@@ -11,7 +11,7 @@
       "name": "api-governance",
       "source": "./plugins/api-governance",
       "description": "Stops an agent's breaking edit to an OpenAPI, GraphQL, protobuf, AsyncAPI or MCP contract until a signed grant exists. The required check on the pull request stays the merge gate.",
-      "version": "1.2.3",
+      "version": "1.2.4",
       "author": {
         "name": "CodeRifts",
         "email": "peter@coderifts.com"
@@ -36,7 +36,7 @@
         "repo": "coderifts/agent-hooks"
       },
       "description": "Host adapters for CodeRifts: Claude Code PreToolUse asks before Write/Edit of OpenAPI, AsyncAPI, GraphQL, protobuf, or MCP manifest files. Not the GitHub Action (coderifts/contract-gate) and not the guard library (@coderifts/agent-guard).",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "author": {
         "name": "CodeRifts",
         "email": "peter@coderifts.com"
