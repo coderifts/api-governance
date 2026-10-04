@@ -1,5 +1,5 @@
 {
-  "description": "CodeRifts mod: a tool.call hook that checks a contract Write / Edit / MultiEdit with preflight before it runs, and a band above the prompt with the decision",
+  "description": "CodeRifts mod: a tool.call hook that checks a contract Write / Edit / MultiEdit with preflight before it runs, refuses a Bash command that writes a named contract file and asks before one that can reach a contract without naming it, and a band above the prompt with the decision",
   "modules": [
     "./register.js"
   ]
