@@ -11,7 +11,7 @@
       "name": "api-governance",
       "source": "./plugins/api-governance",
       "description": "Stops an agent's breaking edit to an OpenAPI, GraphQL, protobuf, AsyncAPI or MCP contract until a signed grant exists. The required check on the pull request stays the merge gate.",
-      "version": "1.2.5",
+      "version": "1.2.6",
       "author": {
         "name": "CodeRifts",
         "email": "peter@coderifts.com"
