@@ -27,7 +27,7 @@
 // written by scripts/generate-contract-write-copies.js, byte for byte (the CommonJS twin is a
 // mechanical transform), and its --check fails on any difference. Do not edit a copy.
 
-export const CONTRACT_WRITE_VERSION = '1.1.0';
+export const CONTRACT_WRITE_VERSION = '1.2.0';
 
 /** What a shell write to a named contract file gets, and what an unnamed one gets. */
 export const SHELL_NAMED_DECISION = 'refuse';
@@ -67,6 +67,15 @@ const HOOK_EXTRAS = Object.freeze([
   [/(^|\/)[^/]*tool-schema[^/]*\.json$/i, 'agent_tools'],
   [/(^|\/)tools\.(wire\.v1\.)?json$/i, 'mcp_manifest'],
 ]);
+
+/*
+ * 1.2.0 (2026-10-06, the Claude directory's hold MCP_FORWARDS_CREDENTIAL_ENV): an MCP CLIENT
+ * configuration file — the list of servers a client starts, with their `env` credentials — is not a
+ * contract. `.mcp.json` and `mcp.json` matched the list above (".json" + "mcp") as mcp_manifest, so an
+ * Edit of one sent its whole text, tokens included, to preflight. Decided by name, so the file is never
+ * read to decide; it wins over the project's own `schema:` list too. MCP tool manifests are unchanged.
+ */
+export const MCP_CLIENT_CONFIG = /(^|\/)(\.?mcp\.json|claude_desktop_config\.json|(cline_)?mcp_settings\.json)$/i;
 
 /** `a/./b/../c` → `a/c`; backslashes become slashes; a leading `./` goes. */
 export function normalizePath(p) {
@@ -114,6 +123,7 @@ export function contractType(p, { named = [], excluded = [] } = {}) {
   const rel = normalizePath(p);
   if (!rel) return null;
   if (excluded.some((x) => matchesPattern(rel, x))) return null;
+  if (MCP_CLIENT_CONFIG.test(rel)) return null;
   for (const [re, type] of HOOK_EXTRAS) if (re.test(rel) && !/(^|\/)(node_modules|vendor)\//i.test(rel)) return type;
   if (looksLikeContractPath(rel)) return typeForPath(rel);
   if (named.some((x) => matchesPattern(rel, x))) return typeForPath(rel);

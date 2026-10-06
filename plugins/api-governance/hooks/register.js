@@ -8,8 +8,8 @@
 //   GOVERNANCE_UNAVAILABLE                { decision: 'ask' }   "this is not a finding about your change"
 //   CONTINUE, or not a contract call      next(e)               the session decides as without the mod
 // Without the api_key option the request is preflight_mode=analyze, which authorizes nothing: no break
-// passes the check on, a detected break asks. An ask never weakens a deny from below (a settings rule
-// or another hook): on an ask branch the mod reads next(e) first, and a deny there stays a deny.
+// passes the check on, a detected break asks. An ask is the mod's own answer, written in the return:
+// the mod never reads what next(e) gives back, so it does not consult a deny rule below it (1.2.7).
 // It contacts one address, https://app.coderifts.com/api/v1/preflight, written at the call. Its own
 // deadline (8 s) and its .catch answer GOVERNANCE_UNAVAILABLE → ask: an error, a timeout or an answer it
 // cannot read never passes the check on.
@@ -130,14 +130,13 @@ export function register(on, options) {
 
     if (outcome.branch === 'deny') return { decision: 'deny', reason: outcome.reason };
     if (outcome.branch === 'next') return next(e);
-    // An ask: a deny from below (a settings rule, another hook) stands; otherwise the user decides.
-    const below = await next(e);
-    if (below && below.decision === 'deny') return { decision: 'deny', reason: below.reason || 'Refused by a permission rule.' };
+    // 1.2.7 (the directory's MOD_PERMISSION_ANSWER_UNREAD): an ask is answered here, literally; what
+    // next(e) would give back is never read, so a deny rule below this hook is not consulted.
     return { decision: 'ask', reason: outcome.reason };
-  }).catch(($, e, next) => ({
-    // A failed check is not a pass: the user is asked.
+  }).catch(($, e) => ({
+    // A failed check is not a pass: the user is asked. next is not taken here, so nothing of it is read.
     decision: 'ask',
-    reason: `CodeRifts could not check this ${e.tool} call. ${governanceUnavailable(`the check failed: ${next.error.kind}`)} ${MERGE_GATE}`,
+    reason: `CodeRifts could not check this ${e.tool} call. ${governanceUnavailable('the check failed')} ${MERGE_GATE}`,
   }));
 
   on('turn.start', ($, e, next) => {
@@ -188,11 +187,12 @@ export function readVerdict(mode, answer) {
   }
   const dr = doc && typeof doc.decision_result === 'object' && doc.decision_result !== null ? doc.decision_result : {};
   const breaks = breakSummary(doc);
+  const fix = suggestedFix(doc);
   if (mode === 'analyze') {
     const outcome = doc && doc.analysis_outcome;
     if (outcome === 'NO_BREAK_DETECTED') return { branch: 'pass', label: 'analyze: no break (not an authorization)', receipt: null };
     if (outcome === 'BREAKS_DETECTED') {
-      return { branch: 'approval', label: 'analyze: breaks detected', why: `the change ${breaks || 'breaks its consumers'} (analyzed without a key, which authorizes nothing)` };
+      return { branch: 'approval', label: 'analyze: breaks detected', fix, why: `the change ${breaks || 'breaks its consumers'} (analyzed without a key, which authorizes nothing)` };
     }
     return { branch: 'unavailable', label: `analyze: ${outcome || 'no outcome'}`, why: `the analysis answered ${outcome || 'no outcome'}` };
   }
@@ -200,15 +200,37 @@ export function readVerdict(mode, answer) {
   const receipt = dr.receipt && typeof dr.receipt.token === 'string' ? dr.receipt.token : null;
   const decisionId = typeof dr.decision_id === 'string' && dr.decision_id !== '' ? dr.decision_id : null;
   if (PASS_ACTIONS.includes(action)) return { branch: 'pass', label: action, receipt, decisionId };
-  if (action === 'STOP') return { branch: 'stop', label: action, receipt, decisionId, why: `CodeRifts decided STOP${breaks ? `: the change ${breaks}` : ''}` };
-  if (action === 'REQUEST_APPROVAL') return { branch: 'approval', label: action, receipt, decisionId, why: `CodeRifts decided REQUEST_APPROVAL${breaks ? `: the change ${breaks}` : ''}` };
+  if (action === 'STOP') return { branch: 'stop', label: action, receipt, decisionId, fix, why: `CodeRifts decided STOP${breaks ? `: the change ${breaks}` : ''}` };
+  if (action === 'REQUEST_APPROVAL') return { branch: 'approval', label: action, receipt, decisionId, fix, why: `CodeRifts decided REQUEST_APPROVAL${breaks ? `: the change ${breaks}` : ''}` };
   return { branch: 'unavailable', label: action || 'no execution_action', receipt, decisionId, why: `CodeRifts answered ${action ? `the action ${action}, which this mod does not know` : 'no execution_action'}` };
+}
+
+/**
+ * T19 (2026-10-06): the decision's own suggested fix, as one sentence group: the remediation the answer
+ * carries (authorize: decision_result.remediation_transaction.required_changes; analyze:
+ * analysis.remediations), at most two distinct instructions. Empty when there is none.
+ */
+const MAX_FIXES = 2;
+const MAX_FIX_CHARS = 240;
+function suggestedFix(doc) {
+  const dr = doc && typeof doc.decision_result === 'object' && doc.decision_result !== null ? doc.decision_result : {};
+  const rows = (dr.remediation_transaction && Array.isArray(dr.remediation_transaction.required_changes) && dr.remediation_transaction.required_changes)
+    || (doc && doc.analysis && Array.isArray(doc.analysis.remediations) && doc.analysis.remediations)
+    || [];
+  const out = [];
+  for (const row of rows) {
+    const text = row && typeof row.instruction === 'string' ? row.instruction.trim().slice(0, MAX_FIX_CHARS) : '';
+    if (text && !out.includes(text)) out.push(/[.!?]$/.test(text) ? text : `${text}.`);
+    if (out.length === MAX_FIXES) break;
+  }
+  return out.join(' ');
 }
 
 /** The four branches of a preflight, as text and band. */
 function preflightOutcome(verdict, rel, digest) {
   const band = { label: verdict.label, digest, rel, decisionId: verdict.decisionId || null };
   const t = trail(digest, verdict.decisionId);
+  const fix = verdict.fix ? ` Suggested fix: ${verdict.fix}` : '';
   if (verdict.branch === 'pass') {
     return { branch: 'next', band: { ...band, refused: false }, line: `CodeRifts · ${verdict.label} · ${rel}${t}` };
   }
@@ -217,7 +239,7 @@ function preflightOutcome(verdict, rel, digest) {
       branch: 'deny',
       band: { ...band, refused: true },
       line: `CodeRifts refused · ${rel} · ${verdict.why}${t}`,
-      reason: `CodeRifts refused this edit of ${rel}: ${verdict.why}. Next step: change the contract so it does not break its consumers, or get the change authorized (coderifts.preflight_change_set with preflight_mode=authorize). ${MERGE_GATE}`,
+      reason: `CodeRifts refused this edit of ${rel}: ${verdict.why}. Next step: change the contract so it does not break its consumers, or get the change authorized (coderifts.preflight_change_set with preflight_mode=authorize).${fix} ${MERGE_GATE}`,
     };
   }
   if (verdict.branch === 'approval') {
@@ -225,7 +247,7 @@ function preflightOutcome(verdict, rel, digest) {
       branch: 'ask',
       band: { ...band, refused: true },
       line: `CodeRifts asks · ${rel} · ${verdict.why}${t}`,
-      reason: `CodeRifts asks for your approval of this edit of ${rel}: ${verdict.why}. Approve it only if the consumers of this contract are ready for the change. ${MERGE_GATE}`,
+      reason: `CodeRifts asks for your approval of this edit of ${rel}: ${verdict.why}. Approve it only if the consumers of this contract are ready for the change.${fix} ${MERGE_GATE}`,
     };
   }
   if (verdict.branch === 'rejected') {
@@ -233,14 +255,14 @@ function preflightOutcome(verdict, rel, digest) {
       branch: 'ask',
       band: { ...band, refused: true },
       line: `CodeRifts could not check · ${rel} · ${verdict.why}`,
-      reason: `CodeRifts could not check this edit of ${rel}: ${verdict.why}. Fix the request or the file and retry, or decide yourself; ${MERGE_GATE}`,
+      reason: `CodeRifts could not check this edit of ${rel}: ${verdict.why}. Fix the request or the file and retry, or decide yourself. ${MERGE_GATE}`,
     };
   }
   return {
     branch: 'ask',
     band: { ...band, label: 'GOVERNANCE_UNAVAILABLE', refused: true },
     line: `CodeRifts could not decide · ${rel} · ${verdict.why}`,
-    reason: `CodeRifts could not check this edit of ${rel}. ${governanceUnavailable(verdict.why)} Retry the edit, or decide yourself; ${MERGE_GATE}`,
+    reason: `CodeRifts could not check this edit of ${rel}. ${governanceUnavailable(verdict.why)} Retry the edit, or decide yourself. ${MERGE_GATE}`,
   };
 }
 
