@@ -35,7 +35,7 @@
 //
 // Generated into the plugin by scripts/generate-claude-package.js. Edit this file, not the copy.
 
-import { afterText, decideToolCall } from './contract-write.mjs';
+import { afterText, decideToolCall, pendingListings, readPlan } from './contract-write.mjs';
 
 const DEADLINE_MS = 8000;
 const TIMED_OUT = Object.freeze({ timedOut: true });
@@ -63,6 +63,35 @@ function emptyTurn() {
   return { refused: 0, passed: 0, last: null, lastRefused: null };
 }
 
+// 1.2.9 (2026-10-08/09, the directory's MOD_PERMISSION_ANSWER_UNREAD at register.js:88 of 1.2.7): the
+// directory reads every return in a hook's text as the hook's answer, nested functions included, and
+// 1.2.7's io readers returned calls (`return listingOf(await $.fs.list(...))`). Every $.fs call is made in
+// the hook itself, AHEAD of the decision, from contract-write's readPlan / pendingListings, each awaited
+// into a variable; contract-write then reads only these answers. ioFrom holds no mods API, so no call is
+// reached "via" a helper (claude plugin validate). Something not read ahead is unreadable to contract-write
+// (fail-closed). test/claude-mod-preread.test.js and test/claude-mod-directory-policy.test.js hold both.
+function ioFrom(cwd, named, files, listings) {
+  return {
+    cwd,
+    named,
+    readFile: async (p) => {
+      const f = Object.prototype.hasOwnProperty.call(files, p) ? files[p] : null;
+      if (!f) throw new Error(`${p} was not read ahead`);
+      if (f.error !== undefined) throw new Error(f.error);
+      return f.missing ? null : f.text;
+    },
+    listDir: async (dir) => {
+      if (!Object.prototype.hasOwnProperty.call(listings, dir)) throw new Error(`${dir} was not listed ahead`);
+      return listings[dir];
+    },
+  };
+}
+
+/** What the deadline resolves to (outside the hook for the same reason). */
+function timedOut() {
+  return TIMED_OUT;
+}
+
 export function register(on, options) {
   // The plugin's `api_key` option (userConfig, sensitive): stored by Claude Code in secure storage and
   // handed here. No key → analyze, which authorizes nothing.
@@ -79,26 +108,50 @@ export function register(on, options) {
     } catch {
       yml = null;
     }
-    const io = {
-      cwd,
-      named: parseSchemaList(typeof yml === 'string' ? yml : null),
-      readFile: async (p) => ((await $.fs.exists(p)) ? $.fs.read(p) : null),
-      listDir: async (dir) => {
+    const named = parseSchemaList(typeof yml === 'string' ? yml : null);
+    const call = { tool: e.tool, input: e.input || {} };
+    // Read ahead (1.2.9): every file and every listing contract-write can ask for on this call.
+    const plan = readPlan(call, { cwd, named });
+    let files = {};
+    for (const p of plan.files) {
+      let entry;
+      try {
+        const there = await $.fs.exists(p);
+        entry = there ? { text: await $.fs.read(p) } : { missing: true };
+      } catch (err) {
+        entry = { error: String((err && err.message) || err) };
+      }
+      files = { ...files, [p]: entry };
+    }
+    let listings = {};
+    let pending = await pendingListings(plan.roots, listings);
+    while (pending.length) {
+      for (const dir of pending) {
+        let entries;
         try {
-          return listingOf(await $.fs.list(dir === '.' ? cwd : joinPath(cwd, dir)));
+          entries = listingOf(await $.fs.list(dir === '.' ? cwd : joinPath(cwd, dir)));
         } catch {
-          return null;
+          entries = null;
         }
-      },
-    };
-    const d = await decideToolCall({ tool: e.tool, input: e.input || {} }, io);
+        listings = { ...listings, [dir]: entries };
+      }
+      pending = await pendingListings(plan.roots, listings);
+    }
+    const d = await decideToolCall(call, ioFrom(cwd, named, files, listings));
     if (d.action === 'pass') return next(e);
 
     let outcome;
-    if (e.tool === 'Bash') {
+    if (d.reason === 'mcp_json_held') {
+      // 1.2.9 (P65d): a plain mcp.json that is both a client configuration and a tool manifest, or that
+      // does not parse — never sent; the user is asked, with contract-write's one sentence.
+      outcome = heldOutcome(d);
+    } else if (e.tool === 'Bash') {
       outcome = shellOutcome(d);
     } else if (d.action === 'refuse') {
       outcome = localOutcome(d);
+    } else if (d.action !== 'gate') {
+      // Only a 'gate' decision is sent; anything else contract-write might answer asks.
+      outcome = undecidedOutcome(d);
     } else {
       const artifact = { id: 'api', type: d.type, before: d.before, after: d.after };
       const answer = await Promise.race([
@@ -111,7 +164,7 @@ export function register(on, options) {
             ? { preflight_mode: 'authorize', artifacts: [artifact], context: { operation: 'merge', environment: 'staging' } }
             : { preflight_mode: 'analyze', artifacts: [artifact] }),
         }),
-        $.clock.sleep(DEADLINE_MS).then(() => TIMED_OUT),
+        $.clock.sleep(DEADLINE_MS).then(timedOut),
       ]);
       const verdict = answer === TIMED_OUT
         ? { branch: 'unavailable', label: 'GOVERNANCE_UNAVAILABLE', why: `CodeRifts did not answer within ${DEADLINE_MS / 1000} s` }
@@ -274,6 +327,19 @@ function localOutcome(d) {
   }
   // The edit does not apply to the file on disk: there is no after text to check, and none is guessed.
   return { branch: 'deny', band, line: `CodeRifts refused · ${d.rel} · ${d.why}`, reason: `CodeRifts refused this edit of ${d.rel}: ${d.why}. Next step: read the file again and redo the edit. ${MERGE_GATE}` };
+}
+
+/** P65d: a held plain mcp.json ('mixed' / 'unparseable'), from a file tool or a shell write — ask, nothing sent. */
+function heldOutcome(d) {
+  const rel = d.rel || (d.scopes || []).join(', ') || 'mcp.json';
+  return { branch: 'ask', band: { label: 'not checked', digest: null, rel, refused: true, decisionId: null }, line: `CodeRifts asks · ${rel} · ${d.why}`, reason: `CodeRifts: ${d.why} ${MERGE_GATE}` };
+}
+
+/** A decision contract-write gives that this mod does not know: ask, nothing sent. */
+function undecidedOutcome(d) {
+  const rel = d.rel || 'a contract file';
+  const why = `contract-write answered ${d.action || 'nothing'}`;
+  return { branch: 'ask', band: { label: 'GOVERNANCE_UNAVAILABLE', digest: null, rel, refused: true, decisionId: null }, line: `CodeRifts could not decide · ${rel} · ${why}`, reason: `CodeRifts could not check this edit of ${rel}. ${governanceUnavailable(why)} ${MERGE_GATE}` };
 }
 
 /** contract-write's answers for a Bash command: a named contract write is refused, an unnamed reach asks. */

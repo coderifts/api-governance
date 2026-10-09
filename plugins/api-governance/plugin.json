@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "api-governance",
-  "version": "1.2.8",
+  "version": "1.2.9",
   "description": "Stops an agent's breaking edit to an OpenAPI, GraphQL, protobuf, AsyncAPI or MCP contract until a signed grant exists. The required check on the pull request stays the merge gate.",
   "author": {
     "name": "CodeRifts",
