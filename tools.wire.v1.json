@@ -1,7 +1,7 @@
 {
   "schema": "coderifts.tools-wire.v1",
   "tool_count": 3,
-  "tools_sha256": "sha256:cb989871bb8376655bff573cb074ecac1e367a2393a88aff067055c07722ecb6",
+  "tools_sha256": "sha256:75515f808619c378be5d30f8e13c7731b227f393985c5e2af38f42ef5cf7cd1f",
   "tools": [
     {
       "name": "preflight_change_set",
@@ -1498,6 +1498,7 @@
               "UNKNOWN_KEY",
               "UNKNOWN_KEY_STATUS",
               "RETIRED_KEY_VALID_AT_ISSUE",
+              "RETIRED_KEY_UNANCHORED",
               "KEY_RETIRED_AFTER_SIGNING",
               "REVOKED_KEY",
               "REVOKED_KEY_UNDECIDABLE",
